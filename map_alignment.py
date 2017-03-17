@@ -494,7 +494,33 @@ def face_category_distance(face1,face2, label_associations=None):
 
 ################################################################################
 def are_same_category(face1,face2, label_associations=None, thr=.4):
-    ''' '''
+    '''
+    This method checks if the two input faces are similar according to 
+    their place category label (count version)
+    for the detials on the "count" version see: assign_label_to_face.__doc__
+
+    Inputs
+    ------
+    face1, face2 ( Face instances )
+
+    Parameters
+    ----------
+    label_associations (dictionary, default None)
+    if the two faces belong to two different arrangments, there is no gaurantee
+    that their labels correctly correspond to each other.
+    to get label_associations, call the method "label_association()".
+    If not provided (default None), it is assumed the two faces belong to the 
+    same arrangement and there for the correspondance are direct.
+
+    thr (float between (0,1), default: 0.4)
+    If the distance between the category of faces is below this, the faces are
+    assumed to belong to the same category
+
+    Note
+    ----
+    It is required that the "assign_label_to_face()" method is called
+    before calling this method.
+    '''
     dis = face_category_distance( face1,face2, label_associations )    
     return True if dis<thr else False
 
@@ -923,7 +949,7 @@ def get_nodes_to_prune (arrangement, low_occ_percent, high_occ_percent):
     return nodes_to_prune
 
 ################################################################################
-def get_edges_to_prune (arrangement,
+def get_edges_to_purge (arrangement,
                         low_occ_percent, high_occ_percent,
                         consider_categories=True):
     '''
@@ -957,7 +983,7 @@ def get_edges_to_prune (arrangement,
 
     Output
     ------
-    edges_to_prune: list of tuples [(s,e,k), ... ]
+    edges_to_purge: list of tuples [(s,e,k), ... ]
 
     Note
     ----
@@ -995,7 +1021,7 @@ def get_edges_to_prune (arrangement,
 
     # todo: raise an error if 'occupancy' is not in the attributes of the nodes and edges
 
-    edges_to_prune = []
+    edges_to_purge = []
     for (s,e,k) in arrangement.graph.edges(keys=True):
         
         # rule 1: (self and twin) not in forbidden_edges
@@ -1017,13 +1043,13 @@ def get_edges_to_prune (arrangement,
         e_is_open = True #float(o)/n < high_occ_percent
                 
         if not_forbidden and edge_is_open and (s_is_open or e_is_open):
-            edges_to_prune.append( (s,e,k) )
+            edges_to_purge.append( (s,e,k) )
     
-    for (s,e,k) in edges_to_prune:
-        if arrangement.graph[s][e][k]['obj'].twinIdx not in edges_to_prune:
-            raise (NameError('there is a half-edge whos twin is not in the "edges_to_prune"'))
+    for (s,e,k) in edges_to_purge:
+        if arrangement.graph[s][e][k]['obj'].twinIdx not in edges_to_purge:
+            raise (NameError('there is a half-edge whos twin is not in the "edges_to_purge"'))
 
-    return edges_to_prune
+    return edges_to_purge
 
 
 ################################################################################
@@ -1249,18 +1275,18 @@ def set_node_occupancy(arrangement,
         arrangement.graph.node[key]['obj'].attributes[attribute_key] = [o, n]
 
 ################################################################################
-def arrangement_pruning(arrangement, image,
-                        image_occupancy_thr = 200,
-                        edge_neighborhood = 10,
-                        node_neighborhood = 10,
-                        low_occ_percent  = .025, # .005 # .01# .02 - below "low_occ_percent"
-                        high_occ_percent = .1, # .050 # .03# .04 - not more than "high_occ_percent"
-                        consider_categories = True
-                       ): 
+def prune_arrangement( arrangement, image,
+                       image_occupancy_thr = 200,
+                       edge_neighborhood = 10,
+                       node_neighborhood = 10,
+                       low_occ_percent  = .025, # .005 # .01# .02 - below "low_occ_percent"
+                       high_occ_percent = .1, # .050 # .03# .04 - not more than "high_occ_percent"
+                       consider_categories = True
+                   ): 
     '''
     category_forbidden
-    It is passed to "get_edges_to_prune"
-    Is category_forbidden is True, "forbidden_edges" in the "get_edges_to_prune"
+    It is passed to "get_edges_to_purge"
+    Is category_forbidden is True, "forbidden_edges" in the "get_edges_to_purge"
     method will include, in addition to boundary edges, those edges in between
     two faces with different place category labels.  
     '''
@@ -1277,20 +1303,19 @@ def arrangement_pruning(arrangement, image,
                        attribute_key='occupancy')
 
     ### prunning - source: occupancy         
-    # edge pruning:
-    edges_to_prune = get_edges_to_prune (arrangement,
-                                         low_occ_percent, high_occ_percent,
+    # edge purging:
+    edges_to_purge = get_edges_to_purge (arrangement,
+                                         low_occ_percent,
+                                         high_occ_percent,
                                          consider_categories)
-    arrangement.remove_edges(edges_to_prune, loose_degree=2)
+    arrangement.remove_edges(edges_to_purge, loose_degree=2)
     
-    # node pruning:
+    # node purging:
     nodes_to_prune = get_nodes_to_prune (arrangement,
                                          low_occ_percent, high_occ_percent)
     arrangement.remove_nodes(nodes_to_prune, loose_degree=2)
     
     return arrangement
-
-
 
 
 ################################################################################
@@ -1357,6 +1382,21 @@ def plot_arrangement(axes, arrange, printLabels=False ):
     aplt.plot_edges (axes, arrange, alp=.1, col='b', printLabels=printLabels)
     aplt.plot_nodes (axes, arrange, alp=.5, col='r', printLabels=printLabels)
     return axes
+
+################################################################################
+def plot_text_edge_occupancy(axes, arrange):
+    for s,e,k in arrange.graph.edges(keys=True):
+        p1 = arrange.graph.node[s]['obj'].point
+        p2 = arrange.graph.node[e]['obj'].point
+        x, y = p1.x.evalf() , p1.y.evalf()
+        dx, dy = p2.x.evalf()-x, p2.y.evalf()-y
+
+        o,n = arrange.graph[s][e][k]['obj'].attributes['occupancy']
+
+        axes.text( x+(dx/2), y+(dy/2), 
+                   '{:.2f}'.format(float(o)/n),
+                   fontdict={'color':'k',  'size': 10})
+
 
 ################################################################################
 def plot_place_categories (axes, arrangement, alpha=.5):
@@ -1432,7 +1472,7 @@ def visualize(X, Y, ax):
 
 
 ################################################################################
-def plot_trnsfromed_images(src, dst, tformM=None ):
+def plot_trnsfromed_images(src, dst, tformM=None, title=None ):
     '''
     tformM - 2darray (3x3)
     default (None) will result in an identity matrix
@@ -1464,8 +1504,10 @@ def plot_trnsfromed_images(src, dst, tformM=None ):
     # # turn of tickes
     # axes.set_xticks([])
     # axes.set_yticks([])
-
     plt.tight_layout()
+
+    if title is not None: axes.set_title(title)
+
     plt.show()
 
 

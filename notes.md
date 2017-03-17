@@ -1,18 +1,104 @@
+Remember
+--------
+- Devil is in the detail, truely...  
+- A PhD student's estimation of the time required to finish a task has a standard deviation equal to estimation value.  
+
+Maps to Use and Target Transfromations
+--------------------------------------
+- E5 floor plan
+  - E5_01 [only two rooms] - (scale=(1.2,1.2), rotation=np.pi/2+0.04, translation=(1526,15))
+  - E5_02 [no rooms]
+  - E5_03 [no rooms - almost the same as E5_02]
+  - E5_04 [BROKEN]
+  - E5_05 [OK]
+  - E5_06 [OK]
+  - E5_07 [OK]
+  - E5_08 [OK]
+
+- F5 floor plan
+  - F5_01 [two conference rooms, kinda broken]
+  - F5_02 [just hall, not good]
+  - F5_03 [two conference rooms]
+  - F5_04 [two conference rooms and one office]
+  - F5_05 [few rooms, but kinda broken]
+
+
 TD
 --
 
-Devil is in the detail, truely...
-A PhD student's estimation of the time required to finish a task has a standard deviation equal to estimation value.
+- [ ] over-decomposition's remedy; switch from edge-pruning to face growing
+  for every neighboruing faces, merge if:
+  1. faces are neighboring with same place categies
+  2. the mutual edges are in the list `edges_to_prune`
+  3. the emerging face must have the same shape as initial faces
+  To do so, you need two methods:
+  - [x] `shape = get_shape_descriptor(face)` - do not update attrubutes
+  - [x] `new_face = merge_faces_on_fly(face1, face2)` - do not mutate arrangement
+
+	OK! it tured out it is way more challenging and here is why:
+	Face growing is supposed to consider face shapes!
+	This means that the process need to be iterative, updating the arrangement
+	with merged faces. this requires runing:
+		- arrange._decompose()
+		- edge/node occupancy
+	And these guys are quite expensive!
+	I can't afford to run them in every iteration that could go one for a while!
+
+- [ ] `edge_pruning` with place categories is suseptible to missing edges if a signle room has two categories__
+		remedy this with either:
+			- playing with the threshold of face similarity (`are_same_category`)
+			- put region seperating edges in a separate list other than `forbidden-list` (e.g. `category_baoundary`)
+			  set the `low_occ_percent` very high (0.5) for normal edge (aggressive pruning)
+			  set the `low_occ_percent` very high (0.01) for edges in category_baoundary (cautious pruning)
+
+	* the followings mess-up prunning:
+	  - [x] `are_same_category(face1,face2)` (debaugged)
+	  - rule 3: `not_high_node_occupancy` - not more than `high_occ_percent`
+
+- [ ] for hyp refute, use "OGM+skiz" or "distance image" and
+	- [$R^2$](https://en.wikipedia.org/wiki/Coefficient_of_determination)
+	- [MSE](https://en.wikipedia.org/wiki/Mean_squared_error)
+	- [RSE](https://en.wikipedia.org/wiki/Residual_sum_of_squares)
+
+- [ ] when done with hyp generation, use CPD and there is no need to adopt Siavash's code.
+  Just find the transformation between `src` and `src_warp`
 
 
+- [ ] big problem with cluster representation (average is not good)  
+maybe include each member of the cluster as a hyp? not too many?
+
+- [ ] proper setting for dbscan clustering
+
+- [ ] convert `con_map` to `topo_map`:
+		contract edges between two nodes with same place category label
+		q: how about the coordinate of the new nodes?
 
 
+- [ ] Show the local minima:
+		For scale in [1,2,3]
+			For rotation in [0, pi/2, pi, 3pi/2]
+				Plot the surface (image alignment cost)
+
+- [ ] `profile_nodes` only considers the `face.attributes['label_vote']`. How to convert to `face.attributes['label_count']`
+
+- [ ] edge pruning based on point-based, not the new fatty version.
+
+- [ ] pathes of the faces have the extent method:
+		Returns the extents (*xmin*, *ymin*, *xmax*, *ymax*) of the path.
+		Unlike computing the extents on the *vertices* alone, this
+		algorithm will take into account the curves and deal with
+		control points appropriately.
+	  so finding the range for MBB neighborhood of circle face is not hard
+	  just fix the damn DPE and you can support circles here too.
+
+- [x] reject a transform if the maps do not overlap after warp.
+  I did it, and many many transformations are rejected!
+  But why are they being created in the first place?
 
 - [x] Finally! one set of results that make sense!
   It came up when I switched tform estimation from 'similarity' to 'affine' and rejecting tforms with mismatching scales.
-  
-```
 
+```
 arr_config = {'multi_processing':4, 'end_point':False, 'timing':False}
 prun_image_occupancy_thr = 200
 prun_edge_neighborhood = 5
@@ -30,7 +116,6 @@ hyp_gen_enforce_match = False
 
 np.abs(tf.scale[0]-tf.scale[1])/np.min(tf.scale) < .1
 # No need to reject weird transforms
-
 
 
 ['E5_layout', 'E5_07_tango']
@@ -59,105 +144,9 @@ cls = sklearn.cluster.DBSCAN(eps=0.051, min_samples=min_s)
 
 ['E5_layout', 'E5_01_tango']
 # doesn't work!
-
 ```
 
-
-
-
-- [x] I got one close answer with:
-( OOPs! it was false alarm! I used tf._inv_matrix!!! :'(( )
-```
-for `['E5_layout', 'E5_01_tango']`, the correct answer should be around:  
-* `scale=(1.2,1.2)`
-* `rotation=np.pi/2+0.04`
-* `translation=(1526,15)`
-
-arr_config = {'multi_processing':4, 'end_point':False, 'timing':False}
-
-prun_image_occupancy_thr = 200,
-prun_edge_neighborhood = 5,
-prun_node_neighborhood = 5,
-prun_low_occ_percent = .025, # below "low_occ_percent"
-prun_high_occ_percent = .1, # not more than "high_occ_percent"
-prun_consider_categories = False)
-
-con_map_neighborhood = 3
-con_map_cross_thr = 9
-
-tforms = mapali.construct_transformation_population(arrangements,
-                                                    connectivity_maps,
-                                                    similarity=['vote','count',None][0],
-                                                    enforce_match=False)
-min_s = int( .2* np.min([ len(arrangements[key].decomposition.faces)
-	for key in keys ]) )
-cls = sklearn.cluster.DBSCAN(eps=0.1, min_samples=min_s) # prunned standard params
-
-and no need to reject bad transforms... scale<0, ...
-```
-
-- [ ] big problem with cluster representation (average is not good)  
-maybe include each member of the cluster as a hyp? not too many?
-
-- [ ] proper setting for dbscan clustering
-
-- [ ] convert `con_map` to `topo_map`:
-		contract edges between two nodes with same place category label
-		q: how about the coordinate of the new nodes?
-
-- [ ] `edge_pruning` with place categories is suseptible to missing edges if a signle room has two categories__
-		remedy this with either:
-			- playing with the threshold of face similarity (`are_same_category`)
-			- put region seperating edges in a separate list other than `forbidden-list` (e.g. `category_baoundary`)
-			  set the `low_occ_percent` very high (0.5) for normal edge (aggressive pruning)
-			  set the `low_occ_percent` very high (0.01) for edges in category_baoundary (cautious pruning)
-
-	* the followings mess-up prunning:
-	  - `are_same_category(face1,face2)`
-	  - rule 3: `not_high_node_occupancy` - not more than `high_occ_percent`
-
-```
-visualizing forbidden edges and edges in between faces with different categories
-
-forbidden_edges  = arrange.get_boundary_halfedges()
-diff_edges = []
-for (f1Idx, f2Idx) in itertools.combinations( range(len(arrange.decomposition.faces)), 2):
-    face1 = arrange.decomposition.faces[f1Idx]
-    face2 = arrange.decomposition.faces[f2Idx]
-    if ( face1.attributes['label_vote'] != face2.attributes['label_vote']):
-        diff_edges.extend( arrange.decomposition.find_mutual_halfEdges(f1Idx, f2Idx) )
-
-aplt.plot_edges(axes[idx], arrange, halfEdgeIdx=diff_edges)
-
-mapali.set_edge_occupancy(arrange, image,
-                          occupancy_thr=200,
-                          neighborhood=5,
-                          attribute_key='occupancy')
-
-for s,e,k in arrange.graph.edges(keys=True):
-    if ((s,e)==(43, 54)) or ((s,e)==(54, 43)):
-        o, n = arrange.graph[s][e][k]['obj'].attributes['occupancy']
-        print( (s,e,k), (o, n, float(o)/n), ((s,e,k) in forbidden_edges), ((s,e,k) in diff_edges) )
-```
-
-- [ ] Show the local minima:
-		For scale in [1,2,3]
-			For rotation in [0, pi/2, pi, 3pi/2]
-				Plot the surface (image alignment cost)
-
-
-- [ ] `profile_nodes` only considers the `face.attributes['label_vote']`. How to convert to `face.attributes['label_count']`
-
-- [ ] edge pruning based on point-based, not the new fatty version.
-
-- [ ] pathes of the faces have the extent method:
-		Returns the extents (*xmin*, *ymin*, *xmax*, *ymax*) of the path.
-		Unlike computing the extents on the *vertices* alone, this
-		algorithm will take into account the curves and deal with
-		control points appropriately.
-	  so finding the range for MBB neighborhood of circle face is not hard
-	  just fix the damn DPE and you can support circles here too.
-
+- [x] I got one close answer with ( OOPs! it was false alarm! I used tf._inv_matrix!!! :'(( )
 
 - [x] assume a rectangle with different hieght and width, the transformation estimated as 'similarity' with return two wrong estimation. If instead I use 'affine', then I can reject those by comparing `np.abs(tf.scale[0]-tf.scale[1])/np.min(tf.scale) <.1 or <.05`.  
 	```
@@ -303,9 +292,6 @@ Meeting with Martin
 * for the node (or even the prime mode) there's no need to look at the occupancy map.
 * but what about the topology? The topological graph certainly doesn't have the global geometric consistency. Over decomposition would change the geometric location and consistency of the dual graphs.
 
-
-
-
 subgraph isomorphism 
 --------------------
 sub-graph isomorphism based on the connectivity graph
@@ -399,22 +385,92 @@ If I manage to properly construct that feature space, then I have to find a tran
 
 What if the transformation is in the form of abstraction-adjustment and pattern matching? then the problem of association is addressed meanwhile. But back to crux one, what should be the feature space that supports adjustment and matching? The matching problem should be substituted with distance metric, and find the answer to the substitution.  
 
-* listen again to the eigenvector description here ~/Dropbox/eigenvector.mp3
-* watch again the chp.6 of lin_alg series by 3blue1brown
+* listen again to the eigenvector description [here](https://soundcloud.com/edwardoneill/steven-strogatz-on-teaching-eigenvectors-and-eigenvalues)
+* watch again the [chp.6](https://www.youtube.com/watch?v=uQhTuRlWMxw) and [chp.10](https://www.youtube.com/watch?v=PFDu9oVAE-g) of linear algebra series by 3blue1brown
 * [ PageRank Algorithm - The Mathematics of Google Search](http://www.math.cornell.edu/~mec/Winter2009/RalucaRemus/Lecture3/lecture3.html)  
+* [The eigenvector of "Why we moved from language X to language Y"](https://erikbern.com/2017/03/15/the-eigenvector-of-why-we-moved-from-language-x-to-language-y.html)
 
 
 code snippet dumpster
 ---------------------
 
 ```python
-''' an example for manual transformation (keys = ['E5_layout', 'E5_07_tango']) '''
+# visualizing forbidden edges and edges in between faces with different categories
+
+forbidden_edges  = arrange.get_boundary_halfedges()
+diff_edges = []
+for (f1Idx, f2Idx) in itertools.combinations( range(len(arrange.decomposition.faces)), 2):
+    face1 = arrange.decomposition.faces[f1Idx]
+    face2 = arrange.decomposition.faces[f2Idx]
+    if ( face1.attributes['label_vote'] != face2.attributes['label_vote']):
+        diff_edges.extend( arrange.decomposition.find_mutual_halfEdges(f1Idx, f2Idx) )
+
+aplt.plot_edges(axes[idx], arrange, halfEdgeIdx=diff_edges)
+
+mapali.set_edge_occupancy(arrange, image,
+                          occupancy_thr=200,
+                          neighborhood=5,
+                          attribute_key='occupancy')
+
+for s,e,k in arrange.graph.edges(keys=True):
+    if ((s,e)==(43, 54)) or ((s,e)==(54, 43)):
+        o, n = arrange.graph[s][e][k]['obj'].attributes['occupancy']
+        print( (s,e,k), (o, n, float(o)/n), ((s,e,k) in forbidden_edges), ((s,e,k) in diff_edges) )
+```
+
+```python
+# example of `merge_faces_on_fly`
+for f1_idx in range(len(arrange.decomposition.faces)):
+    for f2_idx in arrange.decomposition.find_neighbours(f1_idx):
+        new_face = utls.merge_faces_on_fly(arrange, f1_idx, f2_idx)
+        if new_face is None:
+            print (f1_idx, f2_idx)
+
+
+# This plotting doesn't work and I don't have time to fix it
+import arrangement.plotting as aplt
+import matplotlib.patches as mpatches
+fig, axes = plt.subplots(1,1, figsize=(20,12))
+mapali.plot_arrangement(axes, arrange, printLabels=False)
+
+for f1_idx in [0]: #range(len(arrange.decomposition.faces)):
+    for f2_idx in arrange.decomposition.find_neighbours(f1_idx):
+        new_face = utls.merge_faces_on_fly(arrange, f1_idx, f2_idx)
+        
+        if new_face is not None:
+            patch = mpatches.PathPatch(new_face.get_punched_path(),
+                                       facecolor='g', edgecolor=None)
+            p = axes.add_patch(patch)
+            time.sleep(0.5)
+            p.remove()
+            
+        elif new_face is None:
+            p = []
+            f1 = arrange.decomposition.faces[f1_idx]
+            f2 = arrange.decomposition.faces[f2_idx]
+            patch = mpatches.PathPatch(f1.get_punched_path(),
+                                       facecolor='r', edgecolor=None)
+            p.append( axes.add_patch(patch) )
+            patch = mpatches.PathPatch(f2.get_punched_path(),
+                                       facecolor='r', edgecolor=None)
+            p.append( axes.add_patch(patch) )
+            
+            time.sleep(0.1)
+            for p_i in p:
+                p_i.remove()
+
+plt.axis('equal')
+plt.tight_layout()
+plt.show()
+```
+
+```python
+# an example for manual transformation (keys = ['E5_layout', 'E5_07_tango'])
 src = np.array([ [346,907], [518,907], [518,994], [346,994] ])
 dst = np.array([ [529,498], [538,285], [652,290], [643,503] ])
 tform = skimage.transform.estimate_transform( 'similarity', src, dst )
 mapali.plot_trnsfromed_images(images[keys[0]], images[keys[1]], tformM=tform.params)
 ```
-
 
 ```python
 for lbl in unique_labels:
@@ -435,24 +491,23 @@ for lbl in unique_labels:
         print ('\t*********************** rotation :')
         for tf in class_member:
             print (tf.rotation)
-
 ```
 
 ```python
-''' feature scaling (standardization)'''
+# feature scaling (standardization)
 parameters -= np.mean( parameters, axis=0 )
 parameters /= np.std( parameters, axis=0 )
 ```
 
 ```python
-''' using unit vector transformation to represent alignments '''
+# using unit vector transformation to represent alignments
 U = np.array([1,1,1])
 transformed = np.stack([ np.dot(tf.params, U)[:2]
                          for tf in tforms ], axis=0)
 ```
 
 ```python
-''' 2d transformation  feature plotting '''
+# 2d transformation  feature plotting
 skp = 1
 fig, axes = plt.subplots(1,1, figsize=(12,6))
 axes.plot(transformed[:,0][::skp], transformed[:,1][::skp], 'r.', alpha = .3)
@@ -464,11 +519,10 @@ plt.show()
 ```
 
 ```python
-'''
-3d - mayavi - transformation feature plotting
-http://docs.enthought.com/mayavi/mayavi/index.html
-sudo pip install mayavi
-'''
+# 3D - mayavi - transformation feature plotting
+# http://docs.enthought.com/mayavi/mayavi/index.html
+# sudo pip install mayavi
+
 from mayavi import mlab
 mlab.points3d(parameters[:,0][::skp],
               parameters[:,1][::skp],
@@ -491,33 +545,32 @@ highest_deg_node = {}
 ```
 
 ```python
-
 for key in keys:
-    ''' removing nodes from connectivity map, if the face has label -1'''
+    # removing nodes from connectivity map, if the face has label -1
     faces = arrangements[key].decomposition.faces
     nodes_to_remove = [ f_idx
                         for f_idx in connectivity_maps[key].node.keys()
                         if faces[f_idx].attributes['label'] == -1 ]
     connectivity_maps[key].remove_nodes_from(nodes_to_remove)
     
-    ''' find biggest connected_component_subgraphs for every connectivity '''
+    # find biggest connected_component_subgraphs for every connectivity
     subGraphs = list(nx.connected_component_subgraphs( connectivity_maps[key] ) )
     no_node = [len(sg.node) for sg in subGraphs]    
     idx, val = max(enumerate(no_node), key=operator.itemgetter(1))        
     con_map_max_subgraph[key] = subGraphs[idx]
 
-    ''' most_freq_label '''
+    # most_freq_label
     labels_lst = [face.attributes['label']
                   for face in arrangements[key].decomposition.faces]
     most_freq_label[key] = max(set(labels_lst), key=labels_lst.count)
 
-    ''' face area '''
+    # face area
     faces_area = [ face.get_area()
                    for face in arrangements[key].decomposition.faces ]
     index, value = max(enumerate(faces_area), key=operator.itemgetter(1))
     largest_face[key] = index
 
-    ''' highest degree nodes '''
+	#  highest degree nodes
     nd = connectivity_maps[key].degree()
     nd_lst = [nd[k] for k in nd.keys() if nd[k]!=0]
     print ( collections.Counter(nd_lst) )
@@ -527,36 +580,35 @@ for key in keys:
 ```
 
 ```python
+# plotting - marking specific faces
 
-''' plotting - marking specific faces '''
-
-''' mark largest face '''
+# mark largest face
 p  = arrangements[key].decomposition.faces[largest_face[key]].attributes['centre']
 axes[idx].plot (float(p[0]), float(p[1]), 'b*', markersize=15)
 	
-''' mark highest degree node '''
+# mark highest degree node
 p = connectivity_maps[key].node[highest_deg_node[key]]['coordinate']
 axes[idx].plot (float(p[0]), float(p[1]), 'b*', markersize=15)
 
-''' mark "most frequent labels" '''
+# mark "most frequent labels"
 for face in arrangements[key].decomposition.faces:
 	if face.attributes['label'] == most_freq_label[key]:
 		p  = face.attributes['centre']
 		axes[idx].plot (float(p[0]), float(p[1]), 'r+', markersize=15)
 
-''' mark faces with e-measure higher than average '''
+# mark faces with e-measure higher than average
 for n_idx,e_val in enumerate(e):
     if e_val > e.mean():
         f_idx = connectivity_maps[key].node.keys()[n_idx]
         p  = arrangements[key].decomposition.faces[f_idx].attributes['centre']
         axes[idx].plot (float(p[0]), float(p[1]), 'r+', markersize=15)
 
-''' mark centre of the connectivity map '''
+# mark centre of the connectivity map
 for f_idx in nx.center(con_map_max_subgraph[key]):
     p  = arrangements[key].decomposition.faces[f_idx].attributes['centre']
     axes[idx].plot (float(p[0]), float(p[1]), 'b*', markersize=15)
 
-'''  mark periphery of the connectivity map '''
+# mark periphery of the connectivity map
 for n_idx in nx.periphery(con_map_max_subgraph[key]):
     p  = arrangements[key].decomposition.faces[f_idx].attributes['centre']
     axes[idx].plot (float(p[0]), float(p[1]), 'r+', markersize=15)
