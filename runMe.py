@@ -17,7 +17,11 @@ for path in new_paths:
     if not( path in sys.path):
         sys.path.append( path )
 
+# sys.path.append( u'/usr/share/inkscape/extensions' )
+# import inkex
+
 import time
+import copy
 import itertools 
 import operator
 import cv2
@@ -30,21 +34,23 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 import arrangement.arrangement as arr
-reload(arr)
+# reload(arr)
 # import arrangement.plotting as aplt
 # reload(aplt)
-import arrangement.utils as utls
-reload(utls)
+# import arrangement.utils as utls
+# reload(utls)
 # import arrangement.geometricTraits as trts
 # reload(trts)
-import place_categorization as plcat
-reload(plcat)
+# import place_categorization as plcat
+# reload(plcat)
 import map_alignment as mapali
-reload(mapali)
+# reload(mapali)
 
 ### for Python-CPD
 from functools import partial
-from core import (RigidRegistration, AffineRegistration, DeformableRegistration)
+import core as PCD
+# reload (PCD)
+# from core import (RigidRegistration, AffineRegistration, DeformableRegistration)
 # from scipy.io import loadmat
 
 
@@ -77,14 +83,17 @@ keys = [ ['kpt4a_layout', 'kpt4a_lb_tango'], ['kpt4a_lb_tango'] ] [0]
 # keys = [ ['E5_layout', 'E5_04_tango'], ['E5_04_tango'] ] [1]
 keys = [ ['E5_layout', 'E5_05_tango'], ['E5_05_tango'] ] [0]
 # keys = [ ['E5_layout', 'E5_06_tango'], ['E5_06_tango'] ] [0]
-# keys = [ ['E5_layout', 'E5_07_tango'], ['E5_07_tango'] ] [0]
+keys = [ ['E5_layout', 'E5_07_tango'], ['E5_07_tango'] ] [0]
 # keys = [ ['E5_layout', 'E5_08_tango'], ['E5_08_tango'] ] [0]
+# keys = [ ['E5_layout', 'E5_09_tango'], ['E5_09_tango'] ] [0]
+# keys = [ ['E5_layout', 'E5_10_tango'], ['E5_10_tango'] ] [0]
 # keys = ['F5_layout']
 # keys = [ ['F5_layout', 'F5_01_tango'], ['F5_01_tango'] ] [0]
 # keys = [ ['F5_layout', 'F5_02_tango'], ['F5_02_tango'] ] [0]
 # keys = [ ['F5_layout', 'F5_03_tango'], ['F5_03_tango'] ] [0]
 # keys = [ ['F5_layout', 'F5_04_tango'], ['F5_04_tango'] ] [0]
 # keys = [ ['F5_layout', 'F5_05_tango'], ['F5_05_tango'] ] [0]
+# keys = [ ['F5_layout', 'F5_06_tango'], ['F5_06_tango'] ] [0]
 
 ################################################################################
 ####################################################################### dev yard
@@ -97,8 +106,15 @@ prun_image_occupancy_thr = 200
 prun_edge_neighborhood = 5
 prun_node_neighborhood = 5
 prun_low_occ_percent = .025 # below "low_occ_percent"
+# prun_low_occ_percent = .0125 # below "low_occ_percent"
 prun_high_occ_percent = .1 # not more than "high_occ_percent"
-prun_consider_categories = True
+prun_consider_categories = [True, False][0]
+
+
+face_low_occ_percent = .05 # self below "low_occ_percent"
+face_high_occ_percent = .1 # no nodes more than "high_occ_percent"
+face_consider_categories = [True, False][0]
+face_similar_thr = 0.4
 
 con_map_neighborhood = 3 #1
 con_map_cross_thr = 9 #3
@@ -106,17 +122,19 @@ con_map_cross_thr = 9 #3
 ######################################## deployment
 images = {}
 label_images = {}
-arrangements = {}
-connectivity_maps = {}
+dis_images = {}
 skizs = {}
 traits = {}
+
+arrangements = {}
+connectivity_maps = {}
 
 for key in keys:
     print ('\t *** processing map \'{:s}\':'.format(key))
 
     ######################################## loading file
     print ('\t loading files [image, label_image, skiz, triat_data] ...')
-    image, label_image, skiz, trait = mapali.loader(mapali.data_sets[key])
+    image, label_image, dis_image, skiz, trait = mapali.loader(mapali.data_sets[key])
 
     ######################################## deploying arrangement
     print ('\t deploying arrangement ... ')
@@ -124,7 +142,7 @@ for key in keys:
 
     ######################################## assigning place categories to faces
     print ('\t assigning place categories to faces...')
-    mapali.assign_label_to_face(arrange, label_image)
+    mapali.assign_label_to_all_faces(arrange, label_image)
 
     ######################################## edge pruning the arrangement
     print ('\t edge pruning arrangement wrt occupancy map ...') 
@@ -136,17 +154,30 @@ for key in keys:
                                         high_occ_percent = prun_high_occ_percent,
                                         consider_categories = prun_consider_categories)
 
-
     ######################################## updating faces label
     # due to the changes of the arrangement and faces
     print ('\t update place categories to faces assignment ...')
-    mapali.assign_label_to_face(arrange, label_image)    
+    mapali.assign_label_to_all_faces(arrange, label_image)    
+
+    # ######################################## face growing the arrangement
+    # print ('\t face growing the ...') 
+    # arrange = mapali.prune_arrangement_with_face_growing (arrange, label_image,
+    #                                         low_occ_percent=face_low_occ_percent,
+    #                                         high_occ_percent=face_high_occ_percent,
+    #                                         consider_categories=face_consider_categories,
+    #                                         similar_thr=face_similar_thr)
+
+    # ######################################## updating faces label
+    # # due to the changes of the arrangement and faces
+    # print ('\t update place categories to faces assignment ...')
+    # mapali.assign_label_to_all_faces(arrangements[key], label_images[key])    
 
     ######################################## setting face attribute with shape description
     # for face matching and alignment - todo. make this a arranement method?
     print ('\t setting face attribute with shape description ...')    
     for idx,face in enumerate(arrange.decomposition.faces):
         arrange.decomposition.faces[idx].set_shape_descriptor(arrange)
+
 
     ######################################## construct conectivity map
     print ('\t connectivity map construction and node profiling ...')
@@ -155,40 +186,18 @@ for key in keys:
                                        cross_thr=con_map_cross_thr)
     arrange, con_map = mapali.construct_connectivity_map(arrange, set_coordinates=True)
 
-    # # desconnecting nodes whose corresponding faces are -1
-    # discon_faces = [f_idx
-    #                 for (f_idx, face) in enumerate(arrange.decomposition.faces)
-    #                 if face.attributes['label_vote']==-1]
-    # discon_edge = [ (n1_idx, n2_idx)
-    #                 for (n1_idx, n2_idx) in con_map.edges()
-    #                 if ((n1_idx in discon_faces) or (n2_idx in discon_faces)) ]
-    # con_map.remove_edges_from( discon_edge )
-
     # profiling node, for finding label association with other maps
     con_map = mapali.profile_nodes(con_map)
 
 
     ######################################## storing results
     images[key] = image
-    traits[key] = trait    
-    skizs[key] = skiz 
     label_images[key] = label_image
+    dis_images[key] = dis_image
+    skizs[key] = skiz
+    traits[key] = trait
     arrangements[key] = arrange
     connectivity_maps[key] = con_map
-
-
-        
-# for idx, key in enumerate(keys):
-#     mapali.set_node_occupancy(arrangements[key], images[key],
-#                               occupancy_thr=prun_image_occupancy_thr,
-#                               neighborhood=prun_node_neighborhood,
-#                               attribute_key='occupancy')
-
-#     mapali.set_edge_occupancy(arrangements[key], images[key],
-#                               occupancy_thr=prun_image_occupancy_thr,
-#                               neighborhood=prun_edge_neighborhood,
-#                               attribute_key='occupancy')
-
 
 
 ########## plotting 
@@ -201,7 +210,7 @@ if 0:
     for idx, key in enumerate(keys):
 
         ### plotting the ogm, label_image and skiz
-        # mapali.plot_image(axes[idx], label_images[key], alpha=.7, cmap=None)
+        mapali.plot_image(axes[idx], label_images[key], alpha=.7, cmap=None)
         mapali.plot_image(axes[idx], images[key], alpha=.5)
         # mapali.plot_image(axes[idx], skizs[key], alpha=.5)
         
@@ -213,7 +222,7 @@ if 0:
         # mapali.plot_place_categories(axes[idx], arrangements[key], alpha=.3)
 
         ### plot edge occupancy percent - text
-        mapali.plot_text_edge_occupancy(axes[idx], arrangements[key])
+        # mapali.plot_text_edge_occupancy(axes[idx], arrangements[key])
         
 
     plt.tight_layout()
@@ -230,9 +239,16 @@ if 0:
 ################################################################################
 print (4*'\t**************')
 
+
 hypgen_face_similarity = ['vote','count',None][2]
 hypgen_tform_type = ['similarity','affine'][1]
 hypgen_enforce_match = False
+
+print (4*'\t**************')
+print ('\t check this out: ')
+print ('\t use [Oriented Minimum Bounding Box] of faces instead of faces themselves ')
+print ('\t for hypothesis generation')
+print (4*'\t**************')
 
 
 #################### construct the pool of transformations
@@ -351,8 +367,9 @@ print ( '\t *** total: {:d} clusters...'.format(unique_labels.shape[0]-1) )
 #     print('\tcluster {:d} with {:d} memebrs'.format(lbl, len(np.nonzero(labels == lbl)[0]) ) )
 
 
-#################### plotting all transformations and clusters in the "transformed unit-vector" space
-if 1:
+#################### plotting all transformations and clusters
+#################### in the "transformed unit-vector" space
+if 0:
     fig, axes = plt.subplots(1,1, figsize=(20,12))
     U = np.array([1,1,1])
     # Black removed and is used for noise instead.
@@ -382,8 +399,9 @@ if 1:
 
 
 
-#################### plotting src (transformed) and dst images for the average of each cluster
-if 1:
+#################### plotting src (transformed) and dst images
+#################### for the average of each cluster
+if 0:
     for lbl in unique_labels:
         if lbl != -1:
             class_member_idx = np.nonzero(labels == lbl)[0]
@@ -404,262 +422,128 @@ if 1:
                                                     rotation=r_mean,
                                                     translation=t_mean)
             
-            mapali.plot_trnsfromed_images(images[keys[0]],
-                                          images[keys[1]],
-                                          tformM=tf.params,
-                                          title='cluster {:d}'.format(lbl))
+            mapali.plot_transformed_images(images[keys[0]],
+                                           images[keys[1]],
+                                           tformM=tf.params,
+                                           title='cluster {:d}'.format(lbl))
 
 
+# ### plotting the tforms of the "good cluster"
+# good_cluster_idx = 3  # E5_05
+# good_cluster_idx = 14 # E5_07
+# good_cluster = [ tforms[idx] for idx in np.nonzero(labels == good_cluster_idx)[0] ]
+# hypotheses = [tf in good_cluster]
 
-class_member_idx = np.nonzero(labels == 3)[0]
-class_member = [ tforms[idx]
-                 for idx in class_member_idx ]
-for tf in class_member:
-    mapali.plot_trnsfromed_images(images[keys[0]],
-                                  images[keys[1]],
-                                  tformM=tf.params,
-                                  title='cluster {:d}'.format(lbl))
-
-
-
-
-
-def R_squared(src_img, dst_img, tform):
-    rsqr = .0
-    return rsqr
+# for tf_idx,tf in enumerate(good_cluster):
+#     title = 'cluster {:d} - element {:d} '.format(good_cluster_idx, tf_idx)
+#     mapali.plot_transformed_images(images[keys[0]],
+#                                    images[keys[1]],
+#                                    tformM=tf.params,
+#                                    title=title)
 
 
-mse = skimage.measure.compare_mse(im1, im2)
-# Compute the mean-squared error between two images.
-# The mean-squared error (MSE) metric.
+############################# pick the winning hypothesis - face 2 face association and match score
+arr_match_score = {}
+for lbl in unique_labels:
+    if lbl != -1:
+        print (lbl)
+        class_member_idx = np.nonzero(labels == lbl)[0]
+        class_member = [ tforms[idx]
+                         for idx in class_member_idx ]
 
-# mssim = skimage.measure.compare_ssim(X, Y, win_size=None, gaussian_weights=False)
-# # Compute the mean structural similarity index between two images.
-# # The mean structural similarity over the image.
+        t_mean = np.mean([ tf.translation for tf in class_member ], axis=0)
+        r_mean = np.mean([ tf.rotation for tf in class_member ])
+        if hypgen_tform_type=='affine':
+            s_mean = np.mean([ tf.scale[0] for tf in class_member ])
+        elif hypgen_tform_type=='similarity':
+            s_mean = np.mean([ tf.scale for tf in class_member ])
+            
+        tf = skimage.transform.AffineTransform( scale=(s_mean,s_mean),
+                                                rotation=r_mean,
+                                                translation=t_mean)
 
-# # win_size : int or None
-# # The side-length of the sliding window used in comparison. Must be an odd value. If gaussian_weights is True, this is ignored and the window size will depend on sigma.
-
-# # gaussian_weights : bool
-# # If True, each patch has its mean and variance spatially weighted by a normalized Gaussian kernel of width sigma=1.5.
-
-        
-
-
-
-
-
-
-
-# # constructing the desired transform [E5_01]
-# t = skimage.transform.AffineTransform( scale=(1.2,1.2), 
-#                                        rotation=np.pi/2+0.04,
-#                                        translation=(1526,15) )
+        arrange_src = copy.deepcopy(arrangements[keys[0]])
+        arrange_dst = copy.deepcopy(arrangements[keys[1]])
+        arr_match_score[lbl] = mapali.arrangement_match_score_fast(arrange_src, arrange_dst, tf)
 
 
-# # finding targets for [E5_01] (i.e. transforms closet to desired)
-# target = []
-# for idx,tf in enumerate(tforms):
-#     dt = np.sqrt( np.sum( (tf.translation - np.array([1526,15]))**2 ) )
-#     ds = np.abs(tf.scale - 1.2)
-#     dr = np.abs(tf.rotation - (np.pi/2+0.04))
-#     if (ds <0.1) and (dr <0.1) and (dt <200):
-#         target.append(idx)
-# print (len(target))
+good_cluster_idx = max(arr_match_score, key=arr_match_score.get)
+good_cluster = [ tforms[idx] for idx in np.nonzero(labels == good_cluster_idx)[0] ]
+# hypotheses = [tf in good_cluster]
 
+arr_match_score = {}
+for idx, tf in enumerate(good_cluster):
+    arrange_src = copy.deepcopy(arrangements[keys[0]])
+    arrange_dst = copy.deepcopy(arrangements[keys[1]])
+    arr_match_score[idx] = mapali.arrangement_match_score_fast(arrange_src, arrange_dst, tf)
 
-# # checking the variance of parameters in each cluster
-# for lbl in unique_labels:
-#     if lbl != -1:
-#         class_member_idx = np.nonzero(labels == lbl)[0]
-#         class_member = [ tforms[idx]
-#                          for idx in class_member_idx ]
-#         t_var = np.var([ tf.translation
-#                            for tf in class_member ], axis=0)
-#         s_var = np.var([ tf.scale
-#                            for tf in class_member ])
-#         r_var = np.var([ tf.rotation
-#                            for tf in class_member ])        
-#         msg = 'cluster {:d}: t:({:.2f},{:.2f}) - s:{:.2f} - r:{:.2f}'
-#         print (msg.format(lbl,t_var[0],t_var[1],s_var,r_var ))
-# # translation has very high variance, but it's actually ok!
-# # they are not that far, and the high variance seems wierd
-# class_member_idx = np.nonzero(labels == 35)[0]
-# class_member = [ tforms[idx]
-#                  for idx in class_member_idx ]
-# for tf in class_member: print (tf.translation)
-
-
-# # plotting the histogram of parameters' distributions 
-# fig, axes = plt.subplots(1,1, figsize=(20,12))
-# axes.hist(parameters[:,0], facecolor='b', bins=100, alpha=0.7, label='tx')
-# axes.hist(parameters[:,1], facecolor='r', bins=100, alpha=0.7, label='ty')
-# # axes.hist(parameters[:,2], facecolor='g', bins=100, alpha=0.7, label='rotate')
-# # axes.hist(parameters[:,3], facecolor='m', bins=100, alpha=0.7, label='scale')
-# axes.legend(loc=1, ncol=1)
-# axes.set_title('histogram of alignment parameters')
-# plt.tight_layout()
-# plt.show()
-
-
-
-# # plotting all transformations and targets in 1)"transformed unit-vector" space and 2)features space (tx-ty / r-s) 
-# fig, axes = plt.subplots(1,1, figsize=(20,12))
-# U = np.array([1,1,1])
-# # "transformed unit-vector" space
-# xy = np.stack([ np.dot(tforms[idx].params, U)[:2]
-#                 for idx in range(len(tforms)) ], axis=0)
-# axes.plot(xy[:, 0], xy[:, 1], ',',
-#           markerfacecolor='k', markeredgecolor='k')
-# xy = np.stack([ np.dot(tforms[idx].params, U)[:2]
-#                 for idx in target ], axis=0)
-# axes.plot(xy[:, 0], xy[:, 1], '.',
-#           markerfacecolor='r', markeredgecolor='r')
-# # features space (tx-ty)
-# xy = np.stack([ tforms[idx].translation
-#                 for idx in range(len(tforms)) ], axis=0)
-# axes.plot( xy[:, 0], xy[:, 1], ',',
-#            markerfacecolor='k', markeredgecolor='k')
-# xy = np.stack([ tforms[idx].translation
-#                 for idx in target ], axis=0)
-# axes.plot( xy[:, 0], xy[:, 1], '.',
-#            markerfacecolor='r', markeredgecolor='r')
-# # features space (r-s)
-# xy = np.stack([ (tforms[idx].scale, tforms[idx].rotation)
-#                 for idx in range(len(tforms)) ], axis=0)
-# axes.plot( xy[:, 0], xy[:, 1], ',',
-#            markerfacecolor='k', markeredgecolor='k')
-# xy = np.stack([ (tforms[idx].scale, tforms[idx].rotation)
-#                 for idx in target ], axis=0)
-# axes.plot( xy[:, 0], xy[:, 1], '.',
-#            markerfacecolor='r', markeredgecolor='r')
-# plt.axis('equal')
-# plt.tight_layout()
-# plt.show()
-
-
-
-    # ######################################## face growing the arrangement
-    # # for every neighboruing faces, merge if:
-    # #     1. faces are neighboring with same place categies
-    # #     2. the mutual edges are in the list `edges_to_purge`
-    # #     3. the emerging face must have the same shape as initial faces
-    
-    # face_grow_similar_thr = 0.4
-
-    # done_growing = False
-    # while not done_growing :
-
-    #     # unless a new pair of faces are merged, we assume we are done merging
-    #     done_growing = True 
-
-    #     # set node and edge occupancy values
-    #     mapali.set_node_occupancy(arrange, image,
-    #                               occupancy_thr=prun_image_occupancy_thr,
-    #                               neighborhood=prun_node_neighborhood,
-    #                               attribute_key='occupancy')
-
-    #     mapali.set_edge_occupancy(arrangement, image,
-    #                               occupancy_thr=prun_image_occupancy_thr,
-    #                               neighborhood=prun_edge_neighborhood,
-    #                               attribute_key='occupancy')
-
-    #     # be almost generous with this, not too much, this is like a green light
-    #     # the faces won't merge unless they have same category and same shape 
-    #     edges_to_purge = get_edges_to_purge (arrange,
-    #                                          low_occ_percent=prun_low_occ_percent,
-    #                                          high_occ_percent=prun_high_occ_percent,
-    #                                          consider_categories=prun_consider_categories )
-
-
-    #     for f1_idx in range(len(arrange.decomposition.faces)):
-    #         for f2_idx in arrange.decomposition.find_neighbours(f1_idx):
-    #             f1 = arrange.decomposition.faces[f1_idx]
-    #             f2 = arrange.decomposition.faces[f2_idx]
-
-    #             # checking if faces are similar (category label)
-    #             similar_label = mapali.are_same_category(f1,f2,
-    #                                                      label_associations=None,
-    #                                                      thr=face_grow_similar_thr)
-
-    #             # checking if faces are similar (shape)
-    #             f1.set_shape_descriptor(arrange, remove_redundant_lines=True)
-    #             f2.set_shape_descriptor(arrange, remove_redundant_lines=True)
-    #             similar_shape = True if len(utls.match_face_shape(f1,f2))>0 else False
-
-    #             # cheking if it's ok to prun mutual halfedges
-    #             mut_he = arrange.decomposition.find_mutual_halfEdges(f1_idx,f2_idx)
-    #             ok_to_prun = all([he in edges_to_purge for he in mut_he])
-
-    #             if similar_label and similar_shape and ok_to_prun:
-                    
-    #                 new_face = utls.merge_faces_on_fly(arrange, f1_idx, f2_idx)
-    #                 if new_face is not None:
-                    
-    #                     # checking if the new face has similar shape to originals
-    #                     new_face.set_shape_descriptor(arrange, remove_redundant_lines=True)
-    #                     if len(utls.match_face_shape(new_face,f2))>0:
-    #                         done_growing = False
-    #                         arrange.remove_edges(mut_he, loose_degree=2)
-
-
-
-
-
-
-
-
-
-
-
-################################################################################
-###################################################### CPD: coherent point drift
-################################################################################
-'''
-What to use? nodes from arrangement.prime or point samples from occupancy?
-if using occupancy, I can also try daniels work with distance image from skiz computation
-'''
-
-# src: layout
-# dst: tango
-point_set = ['arrangement', 'point_cloud'][1]
-
-if point_set == 'arrangement':
-    arr_src = arrangements[keys[0]]
-    arr_dst = arrangements[keys[1]]
-    src = [arr_src.graph.node[key]['obj'].point for key in arr_src.graph.node.keys()]
-    src = np.array([ [float(p.x),float(p.y)] for p in src ])
-    dst = [arr_dst.graph.node[key]['obj'].point for key in arr_dst.graph.node.keys()]
-    dst = np.array([ [float(p.x),float(p.y)] for p in dst ])
-
-elif point_set == 'point_cloud':
-    # nonzero returns ([y,..],[x,...])
-    # flipped to have (x,y)    
-    img1 = np.flipud( cv2.imread( mapali.data_sets[keys[0]] , cv2.IMREAD_GRAYSCALE) ) 
-    img2 = np.flipud( cv2.imread( mapali.data_sets[keys[1]] , cv2.IMREAD_GRAYSCALE) )
-    skip = 20
-    src = np.fliplr( np.transpose(np.nonzero(img1<10)) )[0:-1:skip]
-    dst = np.fliplr( np.transpose(np.nonzero(img2<10)) )[0:-1:skip]
-print (src.shape, dst.shape)
-
-#### plotting before rotate
-mapali.plot_point_sets (src, dst) # src:blue, dst:red
-
-### transforming before registeration
-# src_warp = tf._apply_mat(src, tf.params)
-rot_mat = lambda t: np.array([[np.cos(t), -np.sin(t)],[np.sin(t), np.cos(t)]])
-
-### registration
-fig = plt.figure()
-fig.add_axes([0, 0, 1, 1])
-callback = partial(mapali.visualize, ax=fig.axes[0])
-reg = RigidRegistration( dst,src,
-                         R=rot_mat(tf.rotation),
-                         t=np.atleast_2d(tf.translation),
-                         s=tf.scale[0],
-                         sigma2=None, maxIterations=100, tolerance=0.001)
-# reg = AffineRegistration(dst, src)
-# reg = DeformableRegistration(dst, src)
-Y_transformed, s, R, t = reg.register(callback)
+for k in arr_match_score:
+    plt.plot(k, arr_match_score[k], 'ro')
 plt.show()
-print (reg.err)
+
+best_idx = max(arr_match_score, key=arr_match_score.get)
+hypothesis =  good_cluster[best_idx]
+
+
+mapali.plot_transformed_images(images[keys[0]], images[keys[1]],
+                               tformM= hypothesis.params,
+                               title='winner is the element {:d} from cluster {:d}'.format(best_idx, good_cluster_idx))
+
+
+########################################
+######## optimizing with distance images
+########################################
+tf = hypothesis
+
+if 1:
+    src_img = dis_images[keys[0]]
+    dst_img = dis_images[keys[1]]
+else:
+    thr1,thr2 = [120, 255]
+    img = np.flipud( cv2.imread( mapali.data_sets[keys[0]], cv2.IMREAD_GRAYSCALE) )
+    ret, src_img = cv2.threshold(img.astype(np.uint8) , thr1,thr2 , cv2.THRESH_BINARY)
+    img = np.flipud( cv2.imread( mapali.data_sets[keys[1]], cv2.IMREAD_GRAYSCALE) )
+    ret, dst_img = cv2.threshold(img.astype(np.uint8) , thr1,thr2 , cv2.THRESH_BINARY)
+
+X0 = (tf.translation[0], tf.translation[1], tf.scale[0], tf.rotation)
+X_bounds = ((None,None),(None,None),(None,None),(None,None)) # No bounds
+X_bounds = ((X0[0]-100,X0[0]+100),(X0[1]-100,X0[1]+100),
+            (X0[2]-.1, X0[2]+.1), (X0[3]-.08,X0[3]+.08))
+methods = [ 'Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG',
+            'L-BFGS-B', 'TNC', 'COBYLA', 'SLSQP', 'dogleg', 'trust-ncg']#[1,5,6,7,8,]
+# [4,9,10]: need jac
+# [0,2,3]: did not converge
+
+result = scipy.optimize.minimize( mapali.objectivefun_image, X0,
+                                  args=(src_img, dst_img),
+                                  method = methods[1],
+                                  # bounds = X_bounds,
+                                  tol=1e-6,
+                                  options={'maxiter':100, 'disp':True} )
+
+if result['success']:
+    fig, axes = plt.subplots(1,2, figsize=(20,12))
+    
+    arrange_src = copy.deepcopy(arrangements[keys[0]])
+    arrange_dst = copy.deepcopy(arrangements[keys[1]])
+    match_score_ini = mapali.arrangement_match_score_fast(arrange_src, arrange_dst, tf)
+    mse_ini, l2_ini = mapali.mse_norm(src_img, dst_img, tf)
+    title_ini = 'initial (match_score:{:.2f}, mse:{:.5f}, l2:{:.2f})'.format(match_score_ini, mse_ini, l2_ini)
+    axes[0] = mapali.plot_transformed_images( images[keys[0]], images[keys[1]],
+                                              tformM=tf.params,
+                                              axes=axes[0], title=title_ini)
+
+    tx,ty,s,t = result['x']
+    tf_opt = skimage.transform.AffineTransform(scale=(s,s), rotation=t, translation=(tx,ty))    
+
+    arrange_src = copy.deepcopy(arrangements[keys[0]])
+    arrange_dst = copy.deepcopy(arrangements[keys[1]])
+    match_score_opt = mapali.arrangement_match_score_fast(arrange_src, arrange_dst, tf_opt)
+    mse_opt, l2_opt = mapali.mse_norm(src_img, dst_img, tf_opt)
+    title_opt = 'optimized (match_score:{:.2f}, mse:{:.5f}, l2:{:.2f})'.format(match_score_opt, mse_opt, l2_opt)
+    axes[1] = mapali.plot_transformed_images( images[keys[0]], images[keys[1]],
+                                              tformM=tf_opt.params,
+                                              axes=axes[1], title=title_opt)
+    plt.tight_layout()
+    plt.show()
+

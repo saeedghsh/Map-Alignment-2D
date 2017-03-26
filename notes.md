@@ -14,14 +14,16 @@ Maps to Use and Target Transfromations
   - E5_06 [OK]
   - E5_07 [OK]
   - E5_08 [OK]
-
+  - E5_09 [OK]
+  - E5_10 [OK]
+  
 - F5 floor plan
   - F5_01 [two conference rooms, kinda broken]
   - F5_02 [just hall, not good]
   - F5_03 [two conference rooms]
   - F5_04 [two conference rooms and one office]
   - F5_05 [few rooms, but kinda broken]
-
+  - F5_06 [seems ok!]
 
 TD
 --
@@ -56,6 +58,7 @@ TD
 	  - rule 3: `not_high_node_occupancy` - not more than `high_occ_percent`
 
 - [ ] for hyp refute, use "OGM+skiz" or "distance image" and
+	- l2
 	- [$R^2$](https://en.wikipedia.org/wiki/Coefficient_of_determination)
 	- [MSE](https://en.wikipedia.org/wiki/Mean_squared_error)
 	- [RSE](https://en.wikipedia.org/wiki/Residual_sum_of_squares)
@@ -73,10 +76,12 @@ maybe include each member of the cluster as a hyp? not too many?
 		contract edges between two nodes with same place category label
 		q: how about the coordinate of the new nodes?
 
+- [ ] detection of brockenness in maps
+	- can not rely on arrangement since it relies on the assumption of global consistency
+	- should it be based on the occupancy map?
 
 - [ ] Show the local minima:
-		For scale in [1,2,3]
-			For rotation in [0, pi/2, pi, 3pi/2]
+		For scale in [1,2,3] - For rotation in [0, pi/2, pi, 3pi/2]
 				Plot the surface (image alignment cost)
 
 - [ ] `profile_nodes` only considers the `face.attributes['label_vote']`. How to convert to `face.attributes['label_count']`
@@ -208,6 +213,15 @@ mapali.plot_node_edge_occupancy_statistics(arrangements[key])
 ```
 
 
+Region intersection and union
+-----------------------------
+So far I couldn't find a decent library (or any for that matter) to handle path intersection operation.
+	* svgpathtools has an intersection function for paths, but it only returns intersection points
+    * I couldn't find anything in inkex, but I didn't search good enough.
+    * shapely does not support paths as matplotlib and svg does, it has only LinearRings of line segement.
+    * matplotlib's intersects_path() only returns Boolean
+So the current implementation pixelates faces and computes area accordingly
+
 
 Data Flow
 ---------
@@ -242,6 +256,25 @@ phase one: Search, finding local minima
 phase two: optimization, optimizing within the vicinity of the local minima
 
 
+Image Registration and Alignment
+--------------------------------
+- [ICP](https://engineering.purdue.edu/kak/distICP/ICP-2.0.html)
+- [(Astronomical) Image Registration](http://image-registration.readthedocs.io/en/latest/) - NOPE!
+- [menpo](https://github.com/menpo/menpo) and [menpofit](https://github.com/menpo/menpofit) - very comprehensive, see [lucas-kanad](http://www.menpo.org/menpofit/lk.html) example for image alignment.
+  but! it downgrades matplotlib to 1.5.
+  there are lots of problem with it! the documentation does not match the implementation.
+  see `~/Dropbox/myGits/dev/menpofit_test.py`
+
+
+Coherent Point Drift
+--------------------
+python implementations of coherent point drift (in the order of being user-friendly):
+- [Python-CPD](https://github.com/siavashk/Python-CPD)
+- [Coherent-Point-Drift-Python](https://github.com/Hennrik/Coherent-Point-Drift-Python)
+- [coherent-point-drift](https://github.com/kwohlfahrt/coherent-point-drift)
+- [pycpd](https://github.com/dpfau/pycpd/blob/master/test/test_fgt.py)
+The algorithm works in a way that the first gradual transformation will map the source point set to location at the center of the destination point set with a severe down scaling. this behaviour is apparantly due the algorithm, not the implementation. see the examples in the paper.
+And after such a transformation it can not recover. This happens even if I provide the "corrrect' initial transformation. 
 
 
 transformation parameters standarzation for clustering
@@ -250,32 +283,56 @@ It is important to standardize, because the translation values are dominantly la
 On the other hand, enough of samples are far off to mis-guide the std and mess the standardizatio. due to this problem, any sample that has translation or scale beyond their respective threshold are dropped out of the pool.
 
 
+Why Abstraction?
+----------------
+Upwards flow is about structuring the data into an abstract representation that is shared among different sensors, followed by assigning semantic labels to structured instances. What follows is a list of potentially target applications for such a process:
+1. The zipper -> enriching the robot's representation of the world by merging multiple sources of information.
+1.a. Semantically annotated instances of the maps can provide cues for finding the vicinity of the solution to the merging problem. While the complete search space might be intractable, such cues could narrow down the search space and simplifying the associated optimization problem.
+1.b. the shared abstract representation make it possible to merge maps of different natures in the absence of a spatiotemporal transformation between the sensors.
+2. Simplifying the path planning (and task assignment?) of agents in a crowded environment with the risk of collision.
+3. Automatic surveying, resulting in a CAD drawings understandable by humans. This was the original objective, right?
+
+
 
 Experiments and results
 -----------------------
+To justify the complexity of the solution, we refer the reader to the results of solving the problem by naive approaches where we treat the maps merely as bitmap images.
+
+Our approach is to solve the alignment problem by finding local minima and perform optimization within the vicinity of those local minima.
+We tackle this challenge by finding rough association between the maps which provides aforementioned local minima, and optimimiz the alignment with the conventional image/point-set registration.
+Towards solving the association problem, we employ a combination of multiple interpretation which are described in chapter x.
+
 * Schewrtfeger - couldn't compile!
 * Daniels image alignment -> all fall into local minima
 * CPD -> all fall into local minima
+* radon-hough based can't solve for all (tx,ty,s,r)
 
 * Randomized hyps followed by (CPD, Image alignment, line-segment match)
 * duality and place category based hyps followed by (CPD, Image alignment, line-segment match)
 
+Future Work - Centainty Metric
+------------------------------
+Complementing the framework with a data-friven reasoning batch, to verify/asses the alignment hypotheses on structural-level (arrangement alignment, i.e abstraction level) and low-level (sensory data).
+This batch provides a centainty metric and potentially cues on hypotheses improvement.
+could remove "global consistency" assumption to deliver solutions to broken maps?
 
-graph-based association
------------------------
-centrality measures (eigen-values, load, harmonic,...) and distance measures (centre, periphery, eccentricity, diameter,...) are sensitive to partiallity of the maps. That is the centre of two connectivity maps of the same environment, but partially overlapping, would have their centers at different locations.  
-On the other hand, isomorphism is sensitive to levels of abstraction in different modalities as well as the repeating patterns of the environment.  
-Among the two approaches, However, the isomorphism is more applicable since it can handle the repeating patterns by enumerating all possible matches, and tackle the discripency in abstraction by employing minor graphs. Nevertheless, it remains a challenging problem since it would depend on multiple factors and has to deal with two problems of different natures.  
-This is a good point to introduce additional sources of information to narrow the search.
-These additional informations could be the congruence constraint over the transformation implied by the associations, and the category cues from shape the of the environments.
+Future Work - Fusion
+--------------------
+The ability to fuse information from different sources of inputs is a crucial step toward building richer models.
+One way is to fuse based on references that is to say semantic similarities of instances in the model. Another would be to find similarity in the representation of the models if the different source of input could be represented with a mutual shared representation.
+- Verification: Find a way to merge the maps without semantics, then compare the results. I think the selling point of semantics is to provide reasonable initial guesses. Emphasis the scale problem.
+- Parallel to developing the outline of the fusion, prepare the "simulation", "ontology", and "inter-modal map association". check out the "knowledge representation formalisms" folder.
+- Ontologies
+- Architecture (Bayes?)
 
 
 Brokenness
 ----------
 if a map is broken, how to recognize the brokenness? If possible to decompose the map into consistent local maps, then they could be separately aligned with the prior CAD map.
 
-Note
-----
+
+Data-File Flow
+--------------
 * Target is arrangement, hence yaml
 * Svg -> direct parsing -> yaml
 * Bitmap -> GUI -> yaml
@@ -291,6 +348,15 @@ Meeting with Martin
 * the problem of abstraction doesn't interfere with node matching, there might be extra nodes, but many will supposedly coincide.
 * for the node (or even the prime mode) there's no need to look at the occupancy map.
 * but what about the topology? The topological graph certainly doesn't have the global geometric consistency. Over decomposition would change the geometric location and consistency of the dual graphs.
+
+
+graph-based association
+-----------------------
+centrality measures (eigen-values, load, harmonic,...) and distance measures (centre, periphery, eccentricity, diameter,...) are sensitive to partiallity of the maps. That is the centre of two connectivity maps of the same environment, but partially overlapping, would have their centers at different locations.  
+On the other hand, isomorphism is sensitive to levels of abstraction in different modalities as well as the repeating patterns of the environment.  
+Among the two approaches, However, the isomorphism is more applicable since it can handle the repeating patterns by enumerating all possible matches, and tackle the discripency in abstraction by employing minor graphs. Nevertheless, it remains a challenging problem since it would depend on multiple factors and has to deal with two problems of different natures.  
+This is a good point to introduce additional sources of information to narrow the search.
+These additional informations could be the congruence constraint over the transformation implied by the associations, and the category cues from shape the of the environments.
 
 subgraph isomorphism 
 --------------------
@@ -356,6 +422,8 @@ for key in keys:
     print ( 'radius: ', nx.radius(con_map_max_subgraph[key]) )
 ```
 
+
+
 USING LINALG (for solving the association problem)
 --------------------------------------------------
 I have a feature vector for each map that describes its characterisitcs in topological space (based on the connectivity graph, e.g. node degrees), and geometric space (based on arrangements and place categories).  
@@ -391,8 +459,415 @@ What if the transformation is in the form of abstraction-adjustment and pattern 
 * [The eigenvector of "Why we moved from language X to language Y"](https://erikbern.com/2017/03/15/the-eigenvector-of-why-we-moved-from-language-x-to-language-y.html)
 
 
+Minor issues and tips
+---------------------
+ - In the arrangement/demo.py `isinstance(arrange.decomposition, arr.Decomposition)` is True, but in the Map-Alignment-2D/runMe.py `isinstance(arrange.decomposition, arr.Decomposition)` is False.
+   It resolves! Not sure how, but probably by reload(arr) in runMe.py. but persists!
+	   is it because of the copy?
+	   or is is because of modification in the instance?
+   It happens when I reload(arr) (also reload(mapali) which has reload(arr) in it). 
+   
+
 code snippet dumpster
 ---------------------
+
+```python
+################################################################################
+###################################################### CPD: coherent point drift
+################################################################################
+'''
+What to use? nodes from arrangement.prime or point samples from occupancy?
+if using occupancy, I can also try daniels work with distance image from skiz computation
+'''
+
+# src: layout
+# dst: tango
+point_set = ['arrangement', 'point_cloud'][0]
+
+if point_set == 'arrangement':
+    arr_src = arrangements[keys[0]]
+    arr_dst = arrangements[keys[1]]
+    src = [arr_src.graph.node[key]['obj'].point for key in arr_src.graph.node.keys()]
+    src = np.array([ [float(p.x),float(p.y)] for p in src ])
+    dst = [arr_dst.graph.node[key]['obj'].point for key in arr_dst.graph.node.keys()]
+    dst = np.array([ [float(p.x),float(p.y)] for p in dst ])
+
+elif point_set == 'point_cloud':
+    # nonzero returns ([y,..],[x,...])
+    # flipped to have (x,y)    
+    img1 = np.flipud( cv2.imread( mapali.data_sets[keys[0]] , cv2.IMREAD_GRAYSCALE) ) 
+    img2 = np.flipud( cv2.imread( mapali.data_sets[keys[1]] , cv2.IMREAD_GRAYSCALE) )
+    skip = 20
+    src = np.fliplr( np.transpose(np.nonzero(img1<10)) )[0:-1:skip]
+    dst = np.fliplr( np.transpose(np.nonzero(img2<10)) )[0:-1:skip]
+print (src.shape, dst.shape)
+
+# np.save('src_'+point_set, src)
+# np.save('dst_'+point_set, dst)
+# np.save('rot', rot_mat(tf.rotation))
+# np.save('tra', np.atleast_2d(tf.translation))
+# np.save('sca', tf.scale[0])
+
+#### plotting input point sets
+mapali.plot_point_sets (src, dst) # src:blue, dst:red
+
+### transforming before registeration
+# src_warp = tf._apply_mat(src, tf.params)
+rot_mat = lambda t: np.array([[np.cos(t), -np.sin(t)],[np.sin(t), np.cos(t)]])
+
+
+### registration
+fig = plt.figure()
+fig.add_axes([0, 0, 1, 1])
+callback = partial(mapali.visualize, ax=fig.axes[0])
+reg = PCD.RigidRegistration( dst,src,
+                             R=rot_mat(tf.rotation),
+                             t=np.atleast_2d(tf.translation),
+                             s=tf.scale[0],
+                             sigma2=None, maxIterations=100, tolerance=0.001)
+# reg = AffineRegistration(dst, src)
+# reg = DeformableRegistration(dst, src)
+Y_transformed, s, R, t = reg.register(callback)
+plt.show()
+print (reg.err)
+```
+
+```python
+########################################
+################# optimizing with points
+########################################
+
+
+# # src: layout
+# # dst: tango
+point_set = ['arrangement', 'point_cloud'][0]
+
+if point_set == 'arrangement':
+    arr_src = arrangements[keys[0]]
+    arr_dst = arrangements[keys[1]]
+    src = [arr_src.graph.node[key]['obj'].point for key in arr_src.graph.node.keys()]
+    src_point_set = np.array([ [float(p.x),float(p.y)] for p in src ])
+    dst = [arr_dst.graph.node[key]['obj'].point for key in arr_dst.graph.node.keys()]
+    dst_point_set = np.array([ [float(p.x),float(p.y)] for p in dst ])
+
+elif point_set == 'point_cloud':
+    # nonzero returns ([y,..],[x,...]) -> flipped lr to have (x,y)    
+    img1 = np.flipud( cv2.imread( mapali.data_sets[keys[0]] , cv2.IMREAD_GRAYSCALE) ) 
+    img2 = np.flipud( cv2.imread( mapali.data_sets[keys[1]] , cv2.IMREAD_GRAYSCALE) )
+    skip = 20
+    src_point_set = np.fliplr( np.transpose(np.nonzero(img1<10)) )[0:-1:skip]
+    dst_point_set = np.fliplr( np.transpose(np.nonzero(img2<10)) )[0:-1:skip]
+print (src_point_set.shape, dst_point_set.shape)
+
+
+# src_point_set = np.load('examples/aligne_optimize/CPD_E5_05_tango/src_point_cloud.npy')
+# dst_point_set = np.load('examples/aligne_optimize/CPD_E5_05_tango/dst_point_cloud.npy')
+
+sigma = 1.5 # from neighborhood size n=5 -> sigma = 0.3(n/2 - 1) + 0.8
+X0 = (tf.translation[0], tf.translation[1], tf.scale[0], tf.rotation)
+X_bounds = ((None,None),(None,None),(None,None),(None,None)) # No bounds
+X_bounds = ((X0[0]-100,X0[0]+100),(X0[1]-100,X0[1]+100),
+            (X0[2]-.1, X0[2]+.1), (X0[3]-.08,X0[3]+.08))
+methods = [ 'Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG',
+         'L-BFGS-B', 'TNC', 'COBYLA', 'SLSQP', 'dogleg', 'trust-ncg']#[1,3,5,7,8,]
+# [4,9,10]: need jac
+# [0,2,6]: did not converge
+
+result = scipy.optimize.minimize(mapali.objectivefun_pointset, X0,
+                                 args=(src_point_set, dst_point_set, sigma),
+                                  method = methods[0],
+                                 # tol=1e-5,
+                                 options={'maxiter':100, 'disp':True} )
+
+
+if result['success']:
+    tx,ty,s,t = result['x']
+    print (tx,ty,s,t)
+
+    tf_opt = skimage.transform.AffineTransform(scale=(s,s), rotation=t,
+                                             translation=(tx,ty))
+
+    fig, axes = plt.subplots(1,2, figsize=(20,12))
+    match_score_ini = mapali.pointset_match_score (src_point_set, dst_point_set,
+                                                   sigma, tf)
+    title_ini = 'initial (match score:{:.2f})'.format(match_score_ini)
+    axes[0] = mapali.plot_transformed_images( images[keys[0]], images[keys[1]],
+                                              tformM=tf.params,
+                                              axes=axes[0],
+                                              title=title_ini)
+    match_score_opt = mapali.pointset_match_score (src_point_set, dst_point_set,
+                                                   sigma, tf_opt)
+    title_opt = 'initial (match score:{:.2f})'.format(match_score_opt)
+    axes[1] = mapali.plot_transformed_images( images[keys[0]], images[keys[1]],
+                                              tformM=tf_opt.params,
+                                              axes=axes[1],
+                                              title=title_opt)
+    plt.tight_layout()
+    plt.show()
+
+    # plt.plot(dst[:,0],dst[:,1], 'b.')
+    # src_warp_opt = tf_opt._apply_mat(src,tf_opt.params)
+    # plt.plot(src_warp[:,0],src_warp[:,1], 'r.')
+    # src_warp_ini = tf._apply_mat(src,tf.params)
+    # plt.plot(src_warp_ini[:,0],src_warp_ini[:,1], 'g.')
+    # plt.show()
+
+```
+
+
+```python
+##### find 
+
+### version 1 - first transform arrangement and then compute match-score
+tf = good_cluster[0]
+tic = time.time()
+arrange_src = copy.deepcopy(arrangements[keys[0]])
+arrange_dst = copy.deepcopy(arrangements[keys[1]])
+arrange_src.transform_sequence( operTypes='SRT',
+                                operVals=( tf.scale, tf.rotation, tf.translation ),
+                                operRefs=( (0,0),    (0,0),       (0,0)  ) )
+s = mapali.arrangement_match_score(arrange_src, arrange_dst)
+print ( 'version 1: score={:.4f}, time={:.4f}'.format(s, time.time()-tic) )
+
+### version 2 - just transform faces (and superfaces) and then compute match-score
+tf = good_cluster[0]
+tic = time.time()
+arrange_src = copy.deepcopy(arrangements[keys[0]])
+arrange_dst = copy.deepcopy(arrangements[keys[1]])
+s = mapali.arrangement_match_score_fast(arrange_src, arrange_dst, tf)
+print ( 'version 2: score={:.4f}, time={:.4f}'.format(s, time.time()-tic) )
+
+```
+
+
+```python
+### face to face association and match score + plotting
+# face to face association
+f2f_association = mapali.find_face2face_association(arrange_src,
+                                                    arrange_dst,
+                                                    distance='area')
+
+# face to face match score (associated faces)
+# note: since each face is dealt with once, this is [almost] OK
+# otherwise, caching the "pixels_in_face" would improve speed. 
+f2f_match_score = {(src_idx,f2f_association[src_idx]): None
+                   for src_idx in f2f_association.keys()}
+for (src_idx,dst_idx) in f2f_match_score.keys():
+    score = mapali.face_match_score(arrange_src.decomposition.faces[src_idx],
+                                    arrange_dst.decomposition.faces[dst_idx])
+    f2f_match_score[(src_idx,dst_idx)] = score
+
+mapali.plot_face2face_association_match_score(arrange_src, arrange_dst,
+                                              f2f_association, f2f_match_score)
+
+```
+
+
+```python
+#############################3### computing the MSE error for each cluster
+src_dis_img = dis_images[keys[0]]
+dst_dis_img = dis_images[keys[1]]
+
+cluster_error = {}
+for lbl in unique_labels:
+    if lbl != -1:
+        class_member_idx = np.nonzero(labels == lbl)[0]
+        class_member = [ tforms[idx]
+                         for idx in class_member_idx ]
+
+        err = [ mapali.mse_norm(src_dis_img, dst_dis_img, tf) 
+                for tf in class_member ]
+        
+        cluster_error[lbl] = err #np.mean(err)
+
+for lbl in unique_labels:
+    if lbl != -1:
+        print (lbl, cluster_error[lbl])
+```
+
+```python
+####### changes of basis to match opencv
+# not solved yet
+A = np.array([[1,0,0],[0,-1,0],[0,0,1]])
+M = np.dot(A,tf.params)
+Mp = np.dot(A,M)
+
+mirr_tf = skimage.transform.AffineTransform(M)
+
+srcimg = cv2.imread( mapali.data_sets[keys[0]], cv2.IMREAD_GRAYSCALE)
+dstimg = cv2.imread( mapali.data_sets[keys[1]], cv2.IMREAD_GRAYSCALE)
+
+aff2d = matplotlib.transforms.Affine2D( mirr_tf.params )
+aff2d = matplotlib.transforms.Affine2D( tf.params )
+fig, axes = plt.subplots(1,1, figsize=(20,12))
+im_dst = axes.imshow(dstimg, origin='upper', cmap='gray', alpha=.5, clip_on=True)
+im_src = axes.imshow(srcimg, origin='upper', cmap='gray', alpha=.5, clip_on=True)
+# im_src.set_transform( matplotlib.transforms.Affine2D( A ) + axes.transData )
+# im_src.set_transform( matplotlib.transforms.Affine2D( tf.params ) + axes.transData )
+# im_src.set_transform( matplotlib.transforms.Affine2D( A ) + axes.transData )
+im_src.set_transform( aff2d + axes.transData )
+
+plt.tight_layout()
+plt.show()
+```
+
+
+```python
+######################################## face growing the arrangement
+# for every neighboruing faces, merge if:
+#     1. faces are neighboring with same place categies
+#     2. the mutual edges are in the list `edges_to_purge`
+#     3. the emerging face must have the same shape as initial faces
+
+face_grow_similar_thr = 0.4
+
+done_growing = False
+while not done_growing :
+
+    # unless a new pair of faces are merged, we assume we are done merging
+    done_growing = True 
+    
+    # set node and edge occupancy values
+    mapali.set_node_occupancy(arrange, image,
+                              occupancy_thr=prun_image_occupancy_thr,
+                              neighborhood=prun_node_neighborhood,
+                              attribute_key='occupancy')
+    
+    mapali.set_edge_occupancy(arrangement, image,
+                              occupancy_thr=prun_image_occupancy_thr,
+                              neighborhood=prun_edge_neighborhood,
+                              attribute_key='occupancy')
+    
+    # be almost generous with this, not too much, this is like a green light
+    # the faces won't merge unless they have same category and same shape 
+    edges_to_purge = get_edges_to_purge (arrange,
+                                         low_occ_percent=prun_low_occ_percent,
+                                         high_occ_percent=prun_high_occ_percent,
+                                         consider_categories=prun_consider_categories )
+
+
+    for f1_idx in range(len(arrange.decomposition.faces)):
+        for f2_idx in arrange.decomposition.find_neighbours(f1_idx):
+            f1 = arrange.decomposition.faces[f1_idx]
+            f2 = arrange.decomposition.faces[f2_idx]
+            
+            # checking if faces are similar (category label)
+            similar_label = mapali.are_same_category(f1,f2,
+                                                     label_associations=None,
+                                                     thr=face_grow_similar_thr)
+            
+            # checking if faces are similar (shape)
+            f1.set_shape_descriptor(arrange, remove_redundant_lines=True)
+            f2.set_shape_descriptor(arrange, remove_redundant_lines=True)
+            similar_shape = True if len(utls.match_face_shape(f1,f2))>0 else False
+            
+            # cheking if it's ok to prun mutual halfedges
+            mut_he = arrange.decomposition.find_mutual_halfEdges(f1_idx,f2_idx)
+            ok_to_prun = all([he in edges_to_purge for he in mut_he])
+            
+            if similar_label and similar_shape and ok_to_prun:
+                
+                new_face = utls.merge_faces_on_fly(arrange, f1_idx, f2_idx)
+                if new_face is not None:
+                    
+                    # checking if the new face has similar shape to originals
+                    new_face.set_shape_descriptor(arrange, remove_redundant_lines=True)
+                    if len(utls.match_face_shape(new_face,f2))>0:
+                        done_growing = False
+                        arrange.remove_edges(mut_he, loose_degree=2)
+```
+
+
+```python
+# constructing the desired transform [E5_01]
+t = skimage.transform.AffineTransform( scale=(1.2,1.2), 
+                                       rotation=np.pi/2+0.04,
+                                       translation=(1526,15) )
+```
+
+```python
+# finding targets for [E5_01] (i.e. transforms closet to desired)
+target = []
+for idx,tf in enumerate(tforms):
+    dt = np.sqrt( np.sum( (tf.translation - np.array([1526,15]))**2 ) )
+    ds = np.abs(tf.scale - 1.2)
+    dr = np.abs(tf.rotation - (np.pi/2+0.04))
+    if (ds <0.1) and (dr <0.1) and (dt <200):
+        target.append(idx)
+print (len(target))
+```
+
+```python
+# checking the variance of parameters in each cluster
+for lbl in unique_labels:
+    if lbl != -1:
+        class_member_idx = np.nonzero(labels == lbl)[0]
+        class_member = [ tforms[idx]
+                         for idx in class_member_idx ]
+        t_var = np.var([ tf.translation
+                           for tf in class_member ], axis=0)
+        s_var = np.var([ tf.scale
+                           for tf in class_member ])
+        r_var = np.var([ tf.rotation
+                           for tf in class_member ])        
+        msg = 'cluster {:d}: t:({:.2f},{:.2f}) - s:{:.2f} - r:{:.2f}'
+        print (msg.format(lbl,t_var[0],t_var[1],s_var,r_var ))
+# translation has very high variance, but it's actually ok!
+# they are not that far, and the high variance seems wierd
+class_member_idx = np.nonzero(labels == 35)[0]
+class_member = [ tforms[idx]
+                 for idx in class_member_idx ]
+for tf in class_member: print (tf.translation)
+```
+
+```python
+# plotting the histogram of parameters' distributions 
+fig, axes = plt.subplots(1,1, figsize=(20,12))
+axes.hist(parameters[:,0], facecolor='b', bins=100, alpha=0.7, label='tx')
+axes.hist(parameters[:,1], facecolor='r', bins=100, alpha=0.7, label='ty')
+# axes.hist(parameters[:,2], facecolor='g', bins=100, alpha=0.7, label='rotate')
+# axes.hist(parameters[:,3], facecolor='m', bins=100, alpha=0.7, label='scale')
+axes.legend(loc=1, ncol=1)
+axes.set_title('histogram of alignment parameters')
+plt.tight_layout()
+plt.show()
+```
+
+```python
+# plotting all transformations and targets in 1)"transformed unit-vector" space and 2)features space (tx-ty / r-s) 
+fig, axes = plt.subplots(1,1, figsize=(20,12))
+U = np.array([1,1,1])
+# "transformed unit-vector" space
+xy = np.stack([ np.dot(tforms[idx].params, U)[:2]
+                for idx in range(len(tforms)) ], axis=0)
+axes.plot(xy[:, 0], xy[:, 1], ',',
+          markerfacecolor='k', markeredgecolor='k')
+xy = np.stack([ np.dot(tforms[idx].params, U)[:2]
+                for idx in target ], axis=0)
+axes.plot(xy[:, 0], xy[:, 1], '.',
+          markerfacecolor='r', markeredgecolor='r')
+# features space (tx-ty)
+xy = np.stack([ tforms[idx].translation
+                for idx in range(len(tforms)) ], axis=0)
+axes.plot( xy[:, 0], xy[:, 1], ',',
+           markerfacecolor='k', markeredgecolor='k')
+xy = np.stack([ tforms[idx].translation
+                for idx in target ], axis=0)
+axes.plot( xy[:, 0], xy[:, 1], '.',
+           markerfacecolor='r', markeredgecolor='r')
+# features space (r-s)
+xy = np.stack([ (tforms[idx].scale, tforms[idx].rotation)
+                for idx in range(len(tforms)) ], axis=0)
+axes.plot( xy[:, 0], xy[:, 1], ',',
+           markerfacecolor='k', markeredgecolor='k')
+xy = np.stack([ (tforms[idx].scale, tforms[idx].rotation)
+                for idx in target ], axis=0)
+axes.plot( xy[:, 0], xy[:, 1], '.',
+           markerfacecolor='r', markeredgecolor='r')
+plt.axis('equal')
+plt.tight_layout()
+plt.show()
+```
 
 ```python
 # visualizing forbidden edges and edges in between faces with different categories
