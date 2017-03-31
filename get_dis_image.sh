@@ -36,5 +36,5 @@ file_list=(
 for file_name in "${file_list[@]}"
 do
     echo processing file $file_name ...
-    python skiz_demo.py --s $file_name
+    python get_dis_image.py --s $file_name
 done

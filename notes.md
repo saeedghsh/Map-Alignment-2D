@@ -1,7 +1,37 @@
+### load data, and perform interpretation 
+deploying arrangement
+arrangement pruning
+place categories to faces assignment
+setting ombb attribute of faces
+connectivity map construction and node profiling
+ 
+
+### generate hypothesis
+label_associations = mapali.label_association(arrangements, connectivity_maps)
+tforms.extend (mapali.align_ombb(face_src,face_dst, tform_type='affine'))
+tforms = mapali.reject_implausible_transformations( tforms )
+
+### pick winning hypothesis
+if tforms.shape[0] < 100:
+    pick best tform accourding to arrangement_match_score
+    hypothesis = tforms[best_idx]
+else:
+	cluster tforms into groups and find a representative for each cluster
+    find the best cluster accourding to arrangement_match_score
+	find the best element in the cluster accourding to arrangement_match_score
+
+### optimize the final solution
+
+
+
+
+
+
 Remember
 --------
 - Devil is in the detail, truely...  
 - A PhD student's estimation of the time required to finish a task has a standard deviation equal to estimation value.  
+
 
 Maps to Use and Target Transfromations
 --------------------------------------
@@ -24,6 +54,47 @@ Maps to Use and Target Transfromations
   - F5_04 [two conference rooms and one office]
   - F5_05 [few rooms, but kinda broken]
   - F5_06 [seems ok!]
+
+
+Configurations:
+---------------
+for my_home:
+```
+arr_config = {'multi_processing':4, 'end_point':False, 'timing':False}
+
+prun_image_occupancy_thr = 200
+prun_edge_neighborhood = 5
+prun_node_neighborhood = 5
+prun_low_occ_percent = .05 # below "low_occ_percent" # for home
+prun_high_occ_percent = .1 # not more than "high_occ_percent"
+prun_consider_categories = [True, False][1]
+
+# don't do face-growing 
+face_low_occ_percent = .05 # self below "low_occ_percent"
+face_high_occ_percent = .1 # no nodes more than "high_occ_percent"
+face_consider_categories = [True, False][0]
+face_similar_thr = 0.4
+
+con_map_neighborhood = 3 #1
+con_map_cross_thr = 9 #3
+
+hypgen_face_similarity = ['vote','count',None][2] -> actually I do use 'vote'
+hypgen_tform_type = ['similarity','affine'][1]
+hypgen_enforce_match = False
+
+
+>>> find label_associations and align ombb of same category faces
+>>> reject bad tforms -> At this point I often end-up with low number of tforms (<30)
+>>> arrangement_match_score_fast() is capable of picking the winner
+```
+
+
+Drawbaxk and limitations
+------------------------
+- computation cost - mention bottle-necks and ideas how to lower the cost.
+- global consistency requirement.
+- only works if the abstraction in inputs meet on a comparable levels. That is to say, if one region is represented with $n$ faces (ideally one) with a particular configuration, the cooresponding region in the other map should be also represented with same number of faces and similar configuration. However, this assumption is not as restrictive as it sounds. Firstly, it should be noted that not all regions need to match in the input maps, but enough to generate plausible hypotheses. Secondly, relying on the assumption of well structure environment it is expected for different maps of the same environment to result in similar deconposition.
+
 
 TD
 --
@@ -470,6 +541,179 @@ Minor issues and tips
 
 code snippet dumpster
 ---------------------
+
+```python
+```
+
+```python
+```
+
+```python
+    # ###### internal plottig of skiz_bitmap method - for the debuging and fine-tuning
+    # internal_plotting = False
+    # if internal_plotting:
+
+    #     import matplotlib.gridspec as gridspec
+    #     gs = gridspec.GridSpec(2, 3)
+        
+    #     # image
+    #     ax1 = plt.subplot(gs[0, 0])
+    #     ax1.set_title('original')
+    #     ax1.imshow(original, cmap = 'gray', interpolation='nearest', origin='lower')
+        
+    #     # image_binary
+    #     ax2 = plt.subplot(gs[1, 0])
+    #     ax2.set_title('image')
+    #     ax2.imshow(image, cmap = 'gray', interpolation='nearest', origin='lower')
+        
+    #     # dis
+    #     ax3 = plt.subplot(gs[0, 1])
+    #     ax3.set_title('dis')
+    #     ax3.imshow(dis, cmap = 'gray', interpolation='nearest', origin='lower')
+        
+    #     # grd_binary
+    #     ax4 = plt.subplot(gs[1, 1])
+    #     ax4.set_title('abs(grd) [binary_inv]')
+    #     ax4.imshow(grd_abs, cmap = 'gray', interpolation='nearest', origin='lower')
+    #     # ax4.imshow(grd_binary_inv, cmap = 'gray', interpolation='nearest', origin='lower')
+        
+    #     # voronoi
+    #     ax5 = plt.subplot(gs[:, 2])
+    #     ax5.set_title('skiz')
+    #     ax5.imshow(skiz, cmap = 'gray', interpolation='nearest', origin='lower')
+
+    # plt.show()
+
+```
+
+```python
+### plotting src (transformed) and dst images for the "center" elemnt of the cluster 
+for lbl in unique_labels:
+    if lbl != -1:
+        class_member_idx = np.nonzero(labels == lbl)[0]
+        class_member = [ tforms[idx]
+                         for idx in class_member_idx ]
+        # it's actually not that bad! inter-cluster tranforms are pretty close
+        # I once (just now) checked about 200 of them...!
+        
+        # pick the one that is closest to all others in the same group
+        params = parameters[class_member_idx]
+        dist_mat = scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(params, 'euclidean'))
+        dist_arr = dist_mat.sum(axis=0)
+        tf = class_member[ np.argmin(dist_arr) ]
+
+        mapali.plot_transformed_images(images[keys[0]], images[keys[1]],
+                                       tformM=tf.params,
+                                       title='cluster {:d}'.format(lbl))
+```
+
+```python
+for tf in tforms:
+	mapali.plot_transformed_images(images[keys[0]], images[keys[1]], tformM= tf.params)
+```
+
+```python
+### plot the histogram of edges' average distance value (from distance images)
+col ={keys[0]:'r', keys[1]:'b'}
+for key in keys:
+    vals = []
+    for (s,e,k) in arrangements[key].graph.edges(keys=True):
+        neighbors_dis_val = arrangements[key].graph[s][e][k]['obj'].attributes['distances']
+        sum_ = neighbors_dis_val.sum() / 255.
+        siz_ = np.max([1,neighbors_dis_val.shape[0]])
+        vals.append( float(sum_)/siz_ )
+    plt.hist(vals, bins = 60, color=col[key], alpha=.7, label=key)
+plt.legend()
+plt.show()
+
+```
+
+```python
+
+# prun_image_occupancy_thr = 200
+# prun_edge_neighborhood = 5
+# prun_node_neighborhood = 5
+# prun_low_occ_percent = .025 # below "low_occ_percent" # for E floor
+# prun_low_occ_percent = .15 # below "low_occ_percent" # for home
+# # prun_low_occ_percent = .0125 # below "low_occ_percent"
+# prun_high_occ_percent = .1 # not more than "high_occ_percent"
+# prun_consider_categories = [True, False][1]
+
+
+	######################################## edge pruning the arrangement
+    print ('\t edge pruning arrangement wrt occupancy map ...') 
+    arrange = mapali.prune_arrangement( arrange, image,
+                                        image_occupancy_thr = prun_image_occupancy_thr,
+                                        edge_neighborhood = prun_edge_neighborhood,
+                                        node_neighborhood = prun_node_neighborhood,
+                                        low_occ_percent  = prun_low_occ_percent,
+                                        high_occ_percent = prun_high_occ_percent,
+                                        consider_categories = prun_consider_categories)
+```
+
+```python
+    ######################################## setting face attribute with shape description
+    # for face matching and alignment - todo. make this a arranement method?
+    print ('\t setting face attribute with shape description ...')    
+    for idx,face in enumerate(arrange.decomposition.faces):
+        arrange.decomposition.faces[idx].set_shape_descriptor(arrange)
+```
+
+```python
+# face_low_occ_percent = .05 # self below "low_occ_percent"
+# face_high_occ_percent = .1 # no nodes more than "high_occ_percent"
+# face_consider_categories = [True, False][0]
+# face_similar_thr = 0.4
+
+	######################################## face growing the arrangement
+    print ('\t face growing the ...') 
+    arrange = mapali.prune_arrangement_with_face_growing (arrange, label_image,
+                                            low_occ_percent=face_low_occ_percent,
+                                            high_occ_percent=face_high_occ_percent,
+                                            consider_categories=face_consider_categories,
+                                            similar_thr=face_similar_thr)
+
+    ######################################## updating faces label
+    # due to the changes of the arrangement and faces
+    print ('\t update place categories to faces assignment ...')
+    mapali.assign_label_to_all_faces(arrangements[key], label_images[key])    
+```
+
+```python
+
+#################### plotting all transformations and clusters
+#################### in the "transformed unit-vector" space
+if 0:
+    fig, axes = plt.subplots(1,1, figsize=(20,12))
+    U = np.array([1,1,1])
+    # Black removed and is used for noise instead.
+    unique_labels = set(labels)
+    
+    colors = plt.cm.Spectral(np.linspace(0, 1, len(unique_labels)))
+    for lbl, col in zip(unique_labels, colors):
+        
+        mrk = '.'
+        if lbl == -1: col, mrk = 'k', ','
+        
+        class_member_idx = np.nonzero(labels == lbl)[0]
+        xy = np.stack([ np.dot(tforms[idx].params, U)[:2]
+                        for idx in class_member_idx ], axis=0)
+        axes.plot( xy[:, 0], xy[:, 1], mrk,
+                   markerfacecolor=col, markeredgecolor=col)
+        
+    # # plotting predefined target cluster
+    # xy = np.stack([ np.dot(tforms[idx].params, U)[:2]
+    #                 for idx in target ], axis=0)
+    # axes.plot(xy[:, 0], xy[:, 1], '*',
+    #           markerfacecolor='r', markeredgecolor='r')
+
+    plt.axis('equal')
+    plt.tight_layout()
+    plt.show()
+
+```
+
+
 
 ```python
 ################################################################################

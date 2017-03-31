@@ -13,7 +13,8 @@ import matplotlib.pyplot as plt
 
 ### for Python-CPD
 from functools import partial
-from core import (RigidRegistration, AffineRegistration)
+from core import (RigidRegistration, AffineRegistration, DeformableRegistration)
+# from scipy.io import loadmat
 
 ################################################################################
 def visualize(X, Y, ax):
