@@ -1,19 +1,18 @@
 from __future__ import print_function
 
-import sys
-if sys.version_info[0] == 3:
-    from importlib import reload
-elif sys.version_info[0] == 2:
-    pass
 
-new_paths = [
-    u'../arrangement/',
-    # u'../Python-CPD/',
-    # u'../place_categorization_2D',
-]
-for path in new_paths:
-    if not( path in sys.path):
-        sys.path.append( path )
+# import sys
+# if sys.version_info[0] == 3:
+#     from importlib import reload
+# elif sys.version_info[0] == 2:
+#     pass
+
+# new_paths = [
+#     u'../arrangement/', # this would be relative address from the runMe.y script that loads this module 
+# ]
+# for path in new_paths:
+#     if not( path in sys.path):
+#         sys.path.append( path )
 
 import copy
 import itertools 
@@ -31,19 +30,13 @@ import skimage.transform
 
 import matplotlib.transforms
 import matplotlib.path as mpath
-# import matplotlib.pyplot as plt
-# import matplotlib.patches as mpatches
 
-import mapali_plotting as maplt
+import Polygon#, Polygon.IO
+
 
 import arrangement.arrangement as arr
-# reload(arr)
-# import arrangement.utils as utls
-# reload(utls)
-# import arrangement.plotting as aplt
-# reload(aplt)
-# import place_categorization as plcat
-# reload(plcat)
+# from . import mapali_plotting as maplt
+import mapali_plotting as maplt # this is used in the runMe.py
 
 
 ################################################################################
@@ -58,7 +51,10 @@ data_sets = {
     'kpt4a_layout':   dir_layout+'sweet_home/kpt4a.png',
 
     # tango maps
-    'HIH_tango':      dir_tango+'HIH_01_full/20170131135829.png',
+    'HIH_01_tango':   dir_tango+'HIH_01_full/20170131135829.png',
+    'HIH_02_tango':   dir_tango+'HIH_02/20170409123351.png',
+    'HIH_03_tango':   dir_tango+'HIH_03/20170409123544.png',
+    'HIH_04_tango':   dir_tango+'HIH_04/20170409123754.png',
 
     'kpt4a_f_tango':  dir_tango+'kpt4a_f/20170131163311.png',
     'kpt4a_kb_tango': dir_tango+'kpt4a_kb/20170131163634.png',
@@ -75,19 +71,29 @@ data_sets = {
     'E5_08_tango':    dir_tango+'E5_8/20170205112339.png',
     'E5_09_tango':    dir_tango+'E5_9/20170205110552.png',
     'E5_10_tango':    dir_tango+'E5_10/20170205111807.png',
+    'E5_11_tango':    dir_tango+'E5_11/20170409125554.png',
+    'E5_12_tango':    dir_tango+'E5_12/20170409130127.png',
+    'E5_13_tango':    dir_tango+'E5_13/20170409130542.png',
+    'E5_14_tango':    dir_tango+'E5_14/20170409131152.png',
     
     'F5_01_tango':    dir_tango+'F5_1/20170131132256.png',
     'F5_02_tango':    dir_tango+'F5_2/20170131125250.png',
     'F5_03_tango':    dir_tango+'F5_3/20170205114543.png',
     'F5_04_tango':    dir_tango+'F5_4/20170205115252.png',
     'F5_05_tango':    dir_tango+'F5_5/20170205115820.png',
-    'F5_06_tango':    dir_tango+'F5_6/20170205114156.png'
+    'F5_06_tango':    dir_tango+'F5_6/20170205114156.png',
+    'F5_07_tango':    dir_tango+'F5_7/20170409113201.png',
+    'F5_08_tango':    dir_tango+'F5_8/20170409113636.png',
+    'F5_09_tango':    dir_tango+'F5_9/20170409114748.png',
+    'F5_10_tango':    dir_tango+'F5_10/20170409115054.png',
+    'F5_11_tango':    dir_tango+'F5_11/20170409115625.png',
+    'F5_12_tango':    dir_tango+'F5_12/20170409120348.png',
+    'F5_13_tango':    dir_tango+'F5_13/20170409120957.png',
+    'F5_14_tango':    dir_tango+'F5_14/20170409121712.png',
+
 }
 
-
-
 ################################################################################
-
 def reject_implausible_transformations(transformations,
                                        image_src_shape, image_dst_shape,
                                        scale_mismatch_ratio_threshold=.1,
@@ -149,7 +155,9 @@ def reject_implausible_transformations(transformations,
 
 ################################################################################
 def align_ombb(face_src,face_dst, tform_type='similarity'):
-    
+    '''
+    move to arr.utls
+    '''
     src = face_src.attributes['ombb_path'].vertices[:-1,:]
     dst = face_dst.attributes['ombb_path'].vertices[:-1,:]
 
@@ -161,6 +169,7 @@ def align_ombb(face_src,face_dst, tform_type='similarity'):
 ################################################################################
 def set_ombb_of_faces (arrangement):
     '''
+    move to arr.utls
     '''
     for face in arrangement.decomposition.faces:
         ombb = oriented_minimum_bounding_box(face.path.vertices)
@@ -170,6 +179,9 @@ def set_ombb_of_faces (arrangement):
 ################################################################################
 def distance2point(p1,p2,p):
     '''
+    move to arr.utls
+    called by "oriented_minimum_bounding_box"
+    
     (p1,p2) represents a line, not a segments
     input points are numpy arrays or lists
     '''
@@ -180,6 +192,9 @@ def distance2point(p1,p2,p):
 ################################################################################
 def linesIntersectionPoint(P1,P2, P3,P4):
     '''
+    move to arr.utls
+    called by "oriented_minimum_bounding_box"
+    
     line1 = P1,P2
     line2 = P3,P4
     
@@ -198,6 +213,10 @@ def linesIntersectionPoint(P1,P2, P3,P4):
 ################################################################################        
 def convexHullArea(vertices):
     '''
+    move to arr.utls
+
+    called by "oriented_minimum_bounding_box"
+
     vertices passed to this function in the form of numpy array
     '''
     ### sorting vertices CCW
@@ -216,6 +235,8 @@ def convexHullArea(vertices):
 ################################################################################
 def oriented_minimum_bounding_box (points):
     '''
+    move to arr.utls
+
     arbitrary oriented minimum bounding box based on rotating caliper
     1_ for each simplex[i] in the polygon (segment between two consequtive vertices):
     a) line1 = simplex[i]
@@ -292,7 +313,7 @@ def oriented_minimum_bounding_box (points):
 
 
 ################################################################################
-def find_face2face_association_fast(faces_src, faces_dst):
+def find_face2face_association(faces_src, faces_dst, aff2d=None):
     '''
     problems:
     this does not result in a one to one assignment
@@ -308,7 +329,11 @@ def find_face2face_association_fast(faces_src, faces_dst):
                                                 face_area_dst_2d,
                                                 'euclidean')
 
-    face_cen_src = np.array([face.attributes['centre'] for face in faces_src])
+    if aff2d is None:
+        face_cen_src = np.array([face.attributes['centre'] for face in faces_src])
+    else:
+        face_cen_src = aff2d.transform(np.array([face.attributes['centre'] for face in faces_src]))
+
     face_cen_dst = np.array([face.attributes['centre'] for face in faces_dst])
         
     f2f_association = {}
@@ -336,67 +361,56 @@ def find_face2face_association_fast(faces_src, faces_dst):
     return f2f_association
 
 ################################################################################
-def arrangement_match_score_fast(arrangement_src, arrangement_dst,
-                                 tform,
-                                 label_associations=None):
+def arrangement_match_score(arrangement_src, arrangement_dst,
+                            tform,
+                            label_associations=None):
     '''
+    tform:  a transformation instance of skimage lib
     '''
     # construct a matplotlib transformation instance (for transformation of paths )
     aff2d = matplotlib.transforms.Affine2D( tform.params )
 
     ### making a deepcopy of each arrangements, so not to disturb original copy
-    arrange_src = copy.deepcopy(arrangement_src)
-    arrange_dst = copy.deepcopy(arrangement_dst)
-
-    ### get the area of the arrange_src
-    superface_src = arrange_src._get_independent_superfaces()[0]
-    superface_src.path = superface_src.path.transformed( aff2d )
-    arrange_src_area = superface_src.get_area()
-
-    ### get the area of the arrange_dst
-    superface_dst = arrange_dst._get_independent_superfaces()[0]
-    # superface_dst.path = superface_dst.path.transformed( aff2d )
-    arrange_dst_area = superface_dst.get_area()
+    ### apparantely it is not needed and works alright without copy! 
+    ### because I already deepcopy them before passing to this method!
+    # arrange_src = copy.deepcopy(arrangement_src)
+    # arrange_dst = copy.deepcopy(arrangement_dst)
+    arrange_src = arrangement_src
+    arrange_dst = arrangement_dst
 
     ### transforming paths of faces, and updating centre points 
     faces_src = arrange_src.decomposition.faces
-    # faces_src = [ face 
-    #               for face in arrange_src.decomposition.faces
-    #               if face.attributes['label_vote'] != -1]
+    # faces_src = [ face for face in arrange_src.decomposition.faces if face.attributes['label_vote'] != -1]
     for face in faces_src:
         face.path = face.path.transformed(aff2d)
         face.attributes['centre'] = np.mean(face.path.vertices[:-1,:], axis=0)
 
     faces_dst = arrange_dst.decomposition.faces
-    # faces_dst = [ face 
-    #               for face in arrange_dst.decomposition.faces
-    #               if face.attributes['label_vote'] != -1]
-    for face in faces_dst:
-        # face.path = face.path.transformed(aff2d)
-        face.attributes['centre'] = np.mean(face.path.vertices[:-1,:], axis=0)
+    # faces_dst = [ face for face in arrange_dst.decomposition.faces if face.attributes['label_vote'] != -1]
+    # for face in faces_dst: face.attributes['centre'] = np.mean(face.path.vertices[:-1,:], axis=0)
     
     # find face to face association
-    f2f_association = find_face2face_association_fast(faces_src, faces_dst)
+    f2f_association = find_face2face_association(faces_src, faces_dst)#, aff2d)
 
     # find face to face match score (of associated faces)
     f2f_match_score = {(f1_idx,f2f_association[f1_idx]): None
                        for f1_idx in f2f_association.keys()}
     for (f1_idx,f2_idx) in f2f_match_score.keys():
-        score = face_match_score(faces_src[f1_idx],
-                                 faces_dst[f2_idx])
+        score = face_match_score(faces_src[f1_idx], faces_dst[f2_idx])#, aff2d)
         f2f_match_score[(f1_idx,f2_idx)] = score
 
     # find the weights of pairs of associated faces to arrangement match score
     face_pair_weight = {}
     for (f1_idx,f2_idx) in f2f_match_score.keys():
-        f1_area = faces_src[f1_idx].get_area()
-        f2_area = faces_dst[f2_idx].get_area()
+        # f1_area = faces_src[f1_idx].get_area()
+        # f2_area = faces_dst[f2_idx].get_area()
     
-        f1_w = float(f1_area) / float(arrange_src_area)
-        f2_w = float(f2_area) / float(arrange_dst_area)
+        # f1_w = float(f1_area) / float(arrange_src_area)
+        # f2_w = float(f2_area) / float(arrange_dst_area)
         
-        face_pair_weight[(f1_idx,f2_idx)] = np.min([f1_w, f2_w])
-
+        # face_pair_weight[(f1_idx,f2_idx)] = np.min([f1_w, f2_w])
+        face_pair_weight[(f1_idx,f2_idx)] = np.min([faces_src[f1_idx].attributes['area_weight'],
+                                                    faces_dst[f2_idx].attributes['area_weight']])
 
     # computing arrangement match score
     if label_associations is None:
@@ -425,38 +439,53 @@ def arrangement_match_score_fast(arrangement_src, arrangement_dst,
 
 
 ################################################################################
-def face_match_score(face1, face2):
+def face_match_score(face_src, face_dst, aff2d=None):
     '''
     NOTE
     ----
-    This face_match_score idea is based on the assumption that the level of abstraction between the two maps are
-    comparable. Or is it? The face_match_score is used for all variation of alignment (hypotheses) between the same
-    two maps, so the dicrepency between levels of abstraction shoudl affect the face_match_score of all hypitheses
-    uniformly
-
-    NOTE
-    ----
-    Union and intersection area are computed by pixelating the paths
-    Obviously this is an approximation....
+    This face_match_score idea is based on the assumption that the level of
+    abstraction between the two maps are comparable.
+    Or is it? The face_match_score is used for all variation of alignment
+    (hypotheses) between the same two maps, so the dicrepency between levels of
+    abstraction should affect the face_match_score of all hypotheses uniformly.
     '''
+    if aff2d is None:
+        p1 = Polygon.Polygon( [tuple(v) for v in face_src.path.vertices] )
+    else:
+        p1 = Polygon.Polygon( [tuple(v) for v in face_src.path.transformed(aff2d).vertices] )
 
-    # compute the area of intersection and union
-    pixels_in_f1 = {tuple(p) for p in get_pixels_in_mpath(face1.path)}
-    pixels_in_f2 = {tuple(p) for p in get_pixels_in_mpath(face2.path)}
-
-    union = len( pixels_in_f1.union(pixels_in_f2) )
-    intersection = len( pixels_in_f1.intersection(pixels_in_f2) )
-
-    if union == 0:
+    p2 = Polygon.Polygon( [tuple(v) for v in face_dst.path.vertices] )
+    union = p1 | p2
+    intersection = p1 & p2
+    if union.area() == 0:
         # if one of the faces has the area equal to zero 
         return 0.
 
-    # computing overlap ratio and score
-    # ratio and score \in [0,1]
-    overlap_ratio = float(intersection) / float(union)
+    overlap_ratio = intersection.area() / union.area()
     overlap_score = (np.exp(overlap_ratio) - 1) / (np.e-1)
-
     return overlap_score
+
+    # # compute the area of intersection and union
+    # # NOTE
+    # # ----
+    # # Union and intersection area are computed by pixelating the paths, Obviously
+    # # this is an approximation.... 
+    # pixels_in_f1 = {tuple(p) for p in get_pixels_in_mpath(face1.path)}
+    # pixels_in_f2 = {tuple(p) for p in get_pixels_in_mpath(face2.path)}
+
+    # union = len( pixels_in_f1.union(pixels_in_f2) )
+    # intersection = len( pixels_in_f1.intersection(pixels_in_f2) )
+
+    # if union == 0:
+    #     # if one of the faces has the area equal to zero 
+    #     return 0.
+
+    # # computing overlap ratio and score
+    # # ratio and score \in [0,1]
+    # overlap_ratio = float(intersection) / float(union)
+    # overlap_score = (np.exp(overlap_ratio) - 1) / (np.e-1)
+
+    # return overlap_score
 
 
 ################################################################################
@@ -557,6 +586,9 @@ def mse_norm(src_image, dst_image, tform):
 ################################################################################
 def get_mpath_area(path):
     '''
+    move to arr.utls
+
+
     TODO:
     Isn't this based on the assumption that the path in convex?
     '''
@@ -571,6 +603,9 @@ def get_mpath_area(path):
 ################################################################################
 def create_mpath ( points ):
     '''
+    move to arr.utls
+
+
     note: points must be in order
     - copied from mesh to OGM
     '''

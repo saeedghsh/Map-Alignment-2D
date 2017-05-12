@@ -1,6 +1,5 @@
 from __future__ import print_function
 
-import os
 import sys
 if sys.version_info[0] == 3:
     from importlib import reload
@@ -9,32 +8,47 @@ elif sys.version_info[0] == 2:
 
 new_paths = [
     u'../arrangement/',
-    # u'../Python-CPD/',
-    # u'../place_categorization_2D',
 ]
 for path in new_paths:
     if not( path in sys.path):
         sys.path.append( path )
 
-# sys.path.append( u'/usr/share/inkscape/extensions' )
-# import inkex
-
 import time
 import copy
-# import itertools
-# import operator
-# import cv2
 import numpy as np
-# import sympy as sym
 import scipy
-# import networkx as nx
 import skimage.transform
 import matplotlib
 import matplotlib.pyplot as plt
 
-# import arrangement.arrangement as arr # ---> import this inside mapali and use it as mapali.arr.[]
-import map_alignment as mapali
+# note: mapali includes plotting methods as mapali.maplt.method()
+# note: mapali includes arrangement as mapali.arr (arr contains arr.utls)
+
+from core import map_alignment as mapali 
 reload(mapali)
+
+'''
+# TODO:
+
+## DEV
+[ ] improve optimization performance/speed (menpofit?)
+[ ] how would the method perform if place categories are not cosidered (this is the only place that I use place categories)
+[ ] improve arrangement_match_score speed
+
+[x] improve f2f_match_score speed (area union/intersection) - used "Polygon" lib
+https://pypi.python.org/pypi/Polygon/2.0.4
+https://github.com/greginvm/pyclipper
+
+## DOC
+[ ] proper docunemtation of the methods in mapali 
+
+## CLEANUP
+[ ] move the identified methods to arrangement
+[x] identify the methods to move to arrangement
+[x] convert the map_alignement to a python package
+
+
+'''
 
 ################################################################################
 ################################################################################ 
@@ -44,8 +58,12 @@ print (4*'\t**************')
 #######################################
 # mapali.data_sets: is a dictionary storing file names
 # mapali.data_sets.keys()
+
 # keys = ['HIH_layout']
-keys = [ ['HIH_layout', 'HIH_tango'], ['HIH_tango'] ][0]
+keys = [ ['HIH_layout', 'HIH_01_tango'], ['HIH_01_tango'] ][0]
+# keys = [ ['HIH_layout', 'HIH_02_tango'], ['HIH_02_tango'] ][0]
+# keys = [ ['HIH_layout', 'HIH_03_tango'], ['HIH_03_tango'] ][0]
+# keys = [ ['HIH_layout', 'HIH_04_tango'], ['HIH_04_tango'] ][0]
 
 # keys = ['kpt4a_layout']
 # keys = [ ['kpt4a_layout', 'kpt4a_f_tango'], ['kpt4a_f_tango'] ] [0]
@@ -63,7 +81,11 @@ keys = [ ['HIH_layout', 'HIH_tango'], ['HIH_tango'] ][0]
 # keys = [ ['E5_layout', 'E5_07_tango'], ['E5_07_tango'] ] [0]
 # keys = [ ['E5_layout', 'E5_08_tango'], ['E5_08_tango'] ] [0]
 # keys = [ ['E5_layout', 'E5_09_tango'], ['E5_09_tango'] ] [0]
-# keys = [ ['E5_layout', 'E5_10_tango'], ['E5_10_tango'] ] [0]
+keys = [ ['E5_layout', 'E5_10_tango'], ['E5_10_tango'] ] [0]
+# keys = [ ['E5_layout', 'E5_11_tango'], ['E5_11_tango'] ] [0]
+# keys = [ ['E5_layout', 'E5_12_tango'], ['E5_12_tango'] ] [0]
+# keys = [ ['E5_layout', 'E5_13_tango'], ['E5_13_tango'] ] [0]
+# keys = [ ['E5_layout', 'E5_14_tango'], ['E5_14_tango'] ] [0]
 
 # keys = ['F5_layout']
 # keys = [ ['F5_layout', 'F5_01_tango'], ['F5_01_tango'] ] [0]
@@ -72,6 +94,14 @@ keys = [ ['HIH_layout', 'HIH_tango'], ['HIH_tango'] ][0]
 # keys = [ ['F5_layout', 'F5_04_tango'], ['F5_04_tango'] ] [0]
 # keys = [ ['F5_layout', 'F5_05_tango'], ['F5_05_tango'] ] [0]
 # keys = [ ['F5_layout', 'F5_06_tango'], ['F5_06_tango'] ] [0]
+# keys = [ ['F5_layout', 'F5_07_tango'], ['F5_07_tango'] ] [0]
+# keys = [ ['F5_layout', 'F5_08_tango'], ['F5_08_tango'] ] [0]
+# keys = [ ['F5_layout', 'F5_09_tango'], ['F5_09_tango'] ] [0]
+# keys = [ ['F5_layout', 'F5_10_tango'], ['F5_10_tango'] ] [0]
+# keys = [ ['F5_layout', 'F5_11_tango'], ['F5_11_tango'] ] [0]
+# keys = [ ['F5_layout', 'F5_12_tango'], ['F5_12_tango'] ] [0]
+# keys = [ ['F5_layout', 'F5_13_tango'], ['F5_13_tango'] ] [0]
+# keys = [ ['F5_layout', 'F5_14_tango'], ['F5_14_tango'] ] [0]
 
 ################################################################################
 ####################################################################### dev yard
@@ -84,14 +114,13 @@ prun_dis_neighborhood = 2
 prun_dis_threshold = .15 # for home environment - distance image 2
 # prun_dis_threshold = .075 # for lab environment - distance image 2
 
-
 con_map_neighborhood = 3 #1
 con_map_cross_thr = 9 #3
+
 
 ######################################## deployment
 images, label_images, dis_images, skizs, traits = {}, {}, {}, {}, {}
 arrangements, connectivity_maps = {}, {}
-
 
 for key in keys:
     print ('\t *** processing map \'{:s}\':'.format(key))
@@ -109,7 +138,7 @@ for key in keys:
     print ('\t deploying arrangement ... ')
     arrange = mapali.arr.Arrangement(trait, arr_config)
 
-    ############### testing distance based edge pruning
+    ###############  distance based edge pruning
     print ('\t arrangement pruning ... ')
     mapali.set_edge_distance_value(arrange, dis_image, prun_dis_neighborhood)
     arrange = mapali.prune_arrangement_with_distance(arrange, dis_image,
@@ -124,6 +153,14 @@ for key in keys:
     ######################################## 
     print ('\t setting ombb attribute of faces ...') 
     arrange = mapali.set_ombb_of_faces (arrange)
+
+    ######################################## 
+    print ('\t caching face area weight ...') 
+    superface = arrange._get_independent_superfaces()[0]
+    arrange_area = superface.get_area()
+    for face in arrange.decomposition.faces:
+        face.attributes['area_weight'] = float(face.get_area()) / float(arrange_area)
+
 
     ######################################## construct conectivity map
     print ('\t connectivity map construction and node profiling ...')
@@ -168,20 +205,20 @@ if 0:
     plt.tight_layout()
     plt.show()
 
+
 ################################################################################
 ########################################################## Hypothesis generation
 ################################################################################
 print (4*'\t**************')
 
-label_associations = mapali.label_association(arrangements, connectivity_maps)
-
+# label_associations = mapali.label_association(arrangements, connectivity_maps)
 tforms = []
 for face_src in arrangements[keys[0]].decomposition.faces:
     for face_dst in arrangements[keys[1]].decomposition.faces:
         src_not_outlier = face_src.attributes['label_vote'] != -1
         dst_not_outlier = face_dst.attributes['label_vote'] != -1
         similar_labels = True
-        similar_labels = label_associations[ face_src.attributes['label_vote'] ] == face_dst.attributes['label_vote']
+        # similar_labels = label_associations[ face_src.attributes['label_vote'] ] == face_dst.attributes['label_vote']
         if src_not_outlier and src_not_outlier and similar_labels:
             tforms.extend (mapali.align_ombb(face_src,face_dst, tform_type='affine'))
 
@@ -200,6 +237,22 @@ if tforms.shape[0] == 0: raise (NameError('no transformation survived.... '))
 ################################################################################
 #################################################### pick the winning hypothesis
 ################################################################################
+
+# from pycallgraph import PyCallGraph
+# from pycallgraph.output import GraphvizOutput
+# with PyCallGraph(output=GraphvizOutput()):
+#     mapali.arrangement_match_score(arrange_src, arrange_dst, tf)
+
+# tic = time.time()
+# N = 10
+# for i in range(N):
+#     mapali.arrangement_match_score(arrange_src, arrange_dst, tf)
+# print ( (time.time()-tic) /N )
+# # t = 0.865351700783 - with deepcopy
+# # t = 0.153898906708 - without deepcopy
+
+
+tic = time.time()
 if tforms.shape[0] < 100:
     #### if tforms.shape[0] <50: no need to cluster
     print ('only {:d} tforms are estimated, so no clustering'.format(tforms.shape[0]))
@@ -208,14 +261,12 @@ if tforms.shape[0] < 100:
     for idx, tf in enumerate(tforms):
         arrange_src = copy.deepcopy(arrangements[keys[0]])
         arrange_dst = copy.deepcopy(arrangements[keys[1]])
-        arr_match_score[idx] = mapali.arrangement_match_score_fast(arrange_src,
-                                                                   arrange_dst,
-                                                                   tf)# ,
-                                                                   # label_associations)
+        arr_match_score[idx] = mapali.arrangement_match_score(arrange_src, arrange_dst, tf)#, label_associations)
         print ('computing match_score for transform-{:d}/{:d}: {:.4f}'.format(idx,tforms.shape[0], arr_match_score[idx]))
 
     best_idx = max(arr_match_score, key=arr_match_score.get)
     hypothesis = tforms[best_idx]
+    # print (time.time() - tic)
 
 else:
     ################################ clustering transformations and winner selection
@@ -255,7 +306,7 @@ else:
 
         arrange_src = copy.deepcopy(arrangements[keys[0]])
         arrange_dst = copy.deepcopy(arrangements[keys[1]])
-        arr_match_score[lbl] = mapali.arrangement_match_score_fast(arrange_src, arrange_dst, tf)#, label_associations)
+        arr_match_score[lbl] = mapali.arrangement_match_score(arrange_src, arrange_dst, tf)#, label_associations)
         print ('cluster {:d}/{:d} arrangement match score: {:.4f}'.format(lbl,len(unique_labels)-1, arr_match_score[lbl]) )
 
     ### pick the winning cluster
@@ -267,7 +318,7 @@ else:
     for idx, tf in enumerate(winning_cluster):
         arrange_src = copy.deepcopy(arrangements[keys[0]])
         arrange_dst = copy.deepcopy(arrangements[keys[1]])
-        arr_match_score[idx] = mapali.arrangement_match_score_fast(arrange_src, arrange_dst, tf)#, label_associations)
+        arr_match_score[idx] = mapali.arrangement_match_score(arrange_src, arrange_dst, tf)#, label_associations)
         print ('element {:d}/{:d} arrangement match score: {:.4f}'.format(idx,len(winning_cluster)-1, arr_match_score[idx]) )
 
     ### pick the wining cluster
@@ -310,7 +361,7 @@ mapali.maplt.plot_transformed_images(images[keys[0]], images[keys[1]],
     
 #     arrange_src = copy.deepcopy(arrangements[keys[0]])
 #     arrange_dst = copy.deepcopy(arrangements[keys[1]])
-#     match_score_ini = mapali.arrangement_match_score_fast(arrange_src,
+#     match_score_ini = mapali.arrangement_match_score(arrange_src,
 #                                                           arrange_dst,
 #                                                           tform)#,
 #                                                           # label_associations)
@@ -325,7 +376,7 @@ mapali.maplt.plot_transformed_images(images[keys[0]], images[keys[1]],
 
 #     arrange_src = copy.deepcopy(arrangements[keys[0]])
 #     arrange_dst = copy.deepcopy(arrangements[keys[1]])
-#     match_score_opt = mapali.arrangement_match_score_fast(arrange_src,
+#     match_score_opt = mapali.arrangement_match_score(arrange_src,
 #                                                           arrange_dst,
 #                                                           tform_opt) #,
 #                                                           # label_associations)
@@ -335,7 +386,7 @@ mapali.maplt.plot_transformed_images(images[keys[0]], images[keys[1]],
 #                                               tformM=tform_opt.params,
 #                                               axes=axes[1], title=title_opt)
     
-#     # fig.savefig('{:s}_{:s}'.format(keys[0],keys[1]))
+#     # fig.savefig('optimize_example')
 #     plt.tight_layout()
 #     plt.show()
 

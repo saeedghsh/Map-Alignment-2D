@@ -2,6 +2,10 @@ import sys
 import cv2
 import numpy as np
 import scipy
+
+import sys
+sys.path.append( u'../core/' )
+sys.path.append( u'/home/saesha/Dropbox/myGits/arrangement/')
 from map_alignment import skiz_bitmap
 ########################################
 # http://scipy.github.io/devdocs/generated/scipy.spatial.Voronoi.html

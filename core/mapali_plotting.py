@@ -1,48 +1,13 @@
 from __future__ import print_function
 
-# import sys
-# if sys.version_info[0] == 3:
-#     from importlib import reload
-# elif sys.version_info[0] == 2:
-#     pass
-
-# new_paths = [
-#     u'../arrangement/',
-#     # u'../Python-CPD/',
-#     # u'../place_categorization_2D',
-# ]
-# for path in new_paths:
-#     if not( path in sys.path):
-#         sys.path.append( path )
-
-
-
-# import copy
 import itertools
-# import collections
-# import cv2
 import numpy as np
-# import numpy.linalg
-# import scipy
-# import scipy.ndimage
-# import sympy as sym
-# import networkx as nx
-# import sklearn.cluster
-# import skimage.transform
-
-# import matplotlib.path as mpath
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import matplotlib.transforms
 
-# import arrangement.arrangement as arr
-# reload(arr)
-# import arrangement.utils as utls
-# reload(utls)
+# note: whoever loads this module, must have added the path to arrangement
 import arrangement.plotting as aplt
-# reload(aplt)
-# import place_categorization as plcat
-# reload(plcat)
 
 ################################################################################
 

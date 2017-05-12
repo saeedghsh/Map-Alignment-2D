@@ -1,29 +1,5 @@
-### load data, and perform interpretation 
-deploying arrangement
-arrangement pruning
-place categories to faces assignment
-setting ombb attribute of faces
-connectivity map construction and node profiling
- 
-
-### generate hypothesis
-label_associations = mapali.label_association(arrangements, connectivity_maps)
-tforms.extend (mapali.align_ombb(face_src,face_dst, tform_type='affine'))
-tforms = mapali.reject_implausible_transformations( tforms )
-
-### pick winning hypothesis
-if tforms.shape[0] < 100:
-    pick best tform accourding to arrangement_match_score
-    hypothesis = tforms[best_idx]
-else:
-	cluster tforms into groups and find a representative for each cluster
-    find the best cluster accourding to arrangement_match_score
-	find the best element in the cluster accourding to arrangement_match_score
-
-### optimize the final solution
-
-
-
+We have tried ICP, CPD, and a variation of Lucas-Kanade image alignment.
+We also tested algorithms that exploit the topology of the environment through graph isomorphism on our dataset.
 
 
 

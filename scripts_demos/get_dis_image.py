@@ -1,14 +1,12 @@
 import sys
 import cv2
 import numpy as np
-import scipy
-from map_alignment import skiz_bitmap
+import scipy.ndimage
+
 ########################################
 # http://scipy.github.io/devdocs/generated/scipy.spatial.Voronoi.html
 # https://pythonhosted.org/pymorph/
 # http://www.inf.u-szeged.hu/~palagyi/skel/skel.html
-
-
 
 def main( file_name ):
     ''''''
@@ -20,7 +18,11 @@ def main( file_name ):
 
     img_binary = np.where( image < 128, 0, 255 )
     dis = scipy.ndimage.morphology.distance_transform_bf( img_binary )
+    # scipy.ndimage.morphology.distance_transform_bf - Distance transform function by a brute force algorithm.
+    # scipy.ndimage.morphology.distance_transform_edt - Exact euclidean distance transform.
+    # scipy.ndimage.morphology.distance_transform_cdt - Distance transform for chamfer type of transforms.
 
+    
     file_name_dis = file_name[:-4]+ '_dis2.png'
     scipy.misc.toimage(dis, cmin=0, cmax=dis.max()).save(file_name_dis)
 
