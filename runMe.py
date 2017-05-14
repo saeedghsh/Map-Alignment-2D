@@ -61,7 +61,7 @@ print (4*'\t**************')
 
 # keys = ['HIH_layout']
 keys = [ ['HIH_layout', 'HIH_01_tango'], ['HIH_01_tango'] ][0]
-# keys = [ ['HIH_layout', 'HIH_02_tango'], ['HIH_02_tango'] ][0]
+keys = [ ['HIH_layout', 'HIH_02_tango'], ['HIH_02_tango'] ][0]
 # keys = [ ['HIH_layout', 'HIH_03_tango'], ['HIH_03_tango'] ][0]
 # keys = [ ['HIH_layout', 'HIH_04_tango'], ['HIH_04_tango'] ][0]
 
@@ -81,7 +81,7 @@ keys = [ ['HIH_layout', 'HIH_01_tango'], ['HIH_01_tango'] ][0]
 # keys = [ ['E5_layout', 'E5_07_tango'], ['E5_07_tango'] ] [0]
 # keys = [ ['E5_layout', 'E5_08_tango'], ['E5_08_tango'] ] [0]
 # keys = [ ['E5_layout', 'E5_09_tango'], ['E5_09_tango'] ] [0]
-keys = [ ['E5_layout', 'E5_10_tango'], ['E5_10_tango'] ] [0]
+# keys = [ ['E5_layout', 'E5_10_tango'], ['E5_10_tango'] ] [0]
 # keys = [ ['E5_layout', 'E5_11_tango'], ['E5_11_tango'] ] [0]
 # keys = [ ['E5_layout', 'E5_12_tango'], ['E5_12_tango'] ] [0]
 # keys = [ ['E5_layout', 'E5_13_tango'], ['E5_13_tango'] ] [0]
@@ -176,6 +176,8 @@ for key in keys:
     arrangements[key] = arrange
     connectivity_maps[key] = con_map
 
+
+
 ########## plotting
 if 0:
     row, col = 1, len(keys)
@@ -238,29 +240,15 @@ if tforms.shape[0] == 0: raise (NameError('no transformation survived.... '))
 #################################################### pick the winning hypothesis
 ################################################################################
 
-# from pycallgraph import PyCallGraph
-# from pycallgraph.output import GraphvizOutput
-# with PyCallGraph(output=GraphvizOutput()):
-#     mapali.arrangement_match_score(arrange_src, arrange_dst, tf)
-
-# tic = time.time()
-# N = 10
-# for i in range(N):
-#     mapali.arrangement_match_score(arrange_src, arrange_dst, tf)
-# print ( (time.time()-tic) /N )
-# # t = 0.865351700783 - with deepcopy
-# # t = 0.153898906708 - without deepcopy
-
-
 tic = time.time()
-if tforms.shape[0] < 100:
+if tforms.shape[0] < 1000:
     #### if tforms.shape[0] <50: no need to cluster
     print ('only {:d} tforms are estimated, so no clustering'.format(tforms.shape[0]))
         
     arr_match_score = {}
     for idx, tf in enumerate(tforms):
-        arrange_src = copy.deepcopy(arrangements[keys[0]])
-        arrange_dst = copy.deepcopy(arrangements[keys[1]])
+        arrange_src = arrangements[keys[0]]
+        arrange_dst = arrangements[keys[1]]
         arr_match_score[idx] = mapali.arrangement_match_score(arrange_src, arrange_dst, tf)#, label_associations)
         print ('computing match_score for transform-{:d}/{:d}: {:.4f}'.format(idx,tforms.shape[0], arr_match_score[idx]))
 
@@ -304,8 +292,8 @@ else:
         dist_arr = dist_mat.sum(axis=0)
         tf = class_member[ np.argmin(dist_arr) ]
 
-        arrange_src = copy.deepcopy(arrangements[keys[0]])
-        arrange_dst = copy.deepcopy(arrangements[keys[1]])
+        arrange_src = arrangements[keys[0]]
+        arrange_dst = arrangements[keys[1]]
         arr_match_score[lbl] = mapali.arrangement_match_score(arrange_src, arrange_dst, tf)#, label_associations)
         print ('cluster {:d}/{:d} arrangement match score: {:.4f}'.format(lbl,len(unique_labels)-1, arr_match_score[lbl]) )
 
@@ -316,8 +304,8 @@ else:
     ### match_score for the entities of the winning cluster
     arr_match_score = {}
     for idx, tf in enumerate(winning_cluster):
-        arrange_src = copy.deepcopy(arrangements[keys[0]])
-        arrange_dst = copy.deepcopy(arrangements[keys[1]])
+        arrange_src = arrangements[keys[0]]
+        arrange_dst = arrangements[keys[1]]
         arr_match_score[idx] = mapali.arrangement_match_score(arrange_src, arrange_dst, tf)#, label_associations)
         print ('element {:d}/{:d} arrangement match score: {:.4f}'.format(idx,len(winning_cluster)-1, arr_match_score[idx]) )
 
@@ -330,63 +318,4 @@ else:
 mapali.maplt.plot_transformed_images(images[keys[0]], images[keys[1]],
                                      tformM= hypothesis.params,
                                      title='winning transform')
-
-
-# ########################################
-# ######## optimizing with distance images
-# ########################################
-# tform = hypothesis
-
-# src_img = dis_images[keys[0]]
-# dst_img = dis_images[keys[1]]
-
-# X0 = (tform.translation[0], tform.translation[1], tform.scale[0], tform.rotation)
-# # X_bounds = ((None,None),(None,None),(None,None),(None,None)) # No bounds
-# # X_bounds = ((X0[0]-100,X0[0]+100),(X0[1]-100,X0[1]+100),
-# #             (X0[2]-.1, X0[2]+.1), (X0[3]-.08,X0[3]+.08))
-# methods = [ 'Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG',
-#             'L-BFGS-B', 'TNC', 'COBYLA', 'SLSQP', 'dogleg', 'trust-ncg']#[1,5,6,7,8,]
-# # [4,9,10]: need jac
-# # [0,2,3]: did not converge
-
-# result = scipy.optimize.minimize( mapali.objectivefun_image, X0,
-#                                   args=(src_img, dst_img),
-#                                   method = methods[1],
-#                                   # bounds = X_bounds,
-#                                   tol=1e-6,
-#                                   options={'maxiter':100, 'disp':True} )
-
-# if result['success']:
-#     fig, axes = plt.subplots(1,2, figsize=(20,12))
-    
-#     arrange_src = copy.deepcopy(arrangements[keys[0]])
-#     arrange_dst = copy.deepcopy(arrangements[keys[1]])
-#     match_score_ini = mapali.arrangement_match_score(arrange_src,
-#                                                           arrange_dst,
-#                                                           tform)#,
-#                                                           # label_associations)
-#     mse_ini, l2_ini = mapali.mse_norm(src_img, dst_img, tform)
-#     title_ini = 'initial (match_score:{:.2f}, mse:{:.5f}, l2:{:.2f})'.format(match_score_ini, mse_ini, l2_ini)
-#     axes[0] = mapali.maplt.plot_transformed_images( images[keys[0]], images[keys[1]],
-#                                               tformM=tform.params,
-#                                               axes=axes[0], title=title_ini)
-
-#     tx,ty,s,t = result['x']
-#     tform_opt = skimage.transform.AffineTransform(scale=(s,s), rotation=t, translation=(tx,ty))    
-
-#     arrange_src = copy.deepcopy(arrangements[keys[0]])
-#     arrange_dst = copy.deepcopy(arrangements[keys[1]])
-#     match_score_opt = mapali.arrangement_match_score(arrange_src,
-#                                                           arrange_dst,
-#                                                           tform_opt) #,
-#                                                           # label_associations)
-#     mse_opt, l2_opt = mapali.mse_norm(src_img, dst_img, tform_opt)
-#     title_opt = 'optimized (match_score:{:.2f}, mse:{:.5f}, l2:{:.2f})'.format(match_score_opt, mse_opt, l2_opt)
-#     axes[1] = mapali.maplt.plot_transformed_images( images[keys[0]], images[keys[1]],
-#                                               tformM=tform_opt.params,
-#                                               axes=axes[1], title=title_opt)
-    
-#     # fig.savefig('optimize_example')
-#     plt.tight_layout()
-#     plt.show()
 

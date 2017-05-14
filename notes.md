@@ -517,11 +517,132 @@ Minor issues and tips
 
 code snippet dumpster
 ---------------------
+```python
+```
 
 ```python
 ```
 
 ```python
+```
+
+
+```python
+########################################
+######## optimizing with distance images
+########################################
+
+tform = hypothesis
+
+src_img = dis_images[keys[0]]
+dst_img = dis_images[keys[1]]
+
+X0 = (tform.translation[0], tform.translation[1], tform.scale[0], tform.rotation)
+# X_bounds = ((None,None),(None,None),(None,None),(None,None)) # No bounds
+# X_bounds = ((X0[0]-100,X0[0]+100),(X0[1]-100,X0[1]+100),
+#             (X0[2]-.1, X0[2]+.1), (X0[3]-.08,X0[3]+.08))
+methods = [ 'Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG',
+            'L-BFGS-B', 'TNC', 'COBYLA', 'SLSQP', 'dogleg', 'trust-ncg']#[1,5,6,7,8,]
+# [4,9,10]: need jac
+# [0,2,3]: did not converge
+
+result = scipy.optimize.minimize( mapali.objectivefun_image, X0,
+                                  args=(src_img, dst_img),
+                                  method = methods[1],
+                                  # bounds = X_bounds,
+                                  tol=1e-6,
+                                  options={'maxiter':100, 'disp':True} )
+
+if result['success']:
+    fig, axes = plt.subplots(1,2, figsize=(20,12))
+    
+    arrange_src = arrangements[keys[0]]
+    arrange_dst = arrangements[keys[1]]
+    match_score_ini = mapali.arrangement_match_score(arrange_src,
+                                                          arrange_dst,
+                                                          tform)#,
+                                                          # label_associations)
+    mse_ini, l2_ini = mapali.mse_norm(src_img, dst_img, tform)
+    title_ini = 'initial (match_score:{:.2f}, mse:{:.5f}, l2:{:.2f})'.format(match_score_ini, mse_ini, l2_ini)
+    axes[0] = mapali.maplt.plot_transformed_images( images[keys[0]], images[keys[1]],
+                                              tformM=tform.params,
+                                              axes=axes[0], title=title_ini)
+
+    tx,ty,s,t = result['x']
+    tform_opt = skimage.transform.AffineTransform(scale=(s,s), rotation=t, translation=(tx,ty))    
+
+    arrange_src = arrangements[keys[0]]
+    arrange_dst = arrangements[keys[1]]
+    match_score_opt = mapali.arrangement_match_score(arrange_src,
+                                                          arrange_dst,
+                                                          tform_opt) #,
+                                                          # label_associations)
+    mse_opt, l2_opt = mapali.mse_norm(src_img, dst_img, tform_opt)
+    title_opt = 'optimized (match_score:{:.2f}, mse:{:.5f}, l2:{:.2f})'.format(match_score_opt, mse_opt, l2_opt)
+    axes[1] = mapali.maplt.plot_transformed_images( images[keys[0]], images[keys[1]],
+                                              tformM=tform_opt.params,
+                                              axes=axes[1], title=title_opt)
+    
+    # fig.savefig('optimize_example')
+    plt.tight_layout()
+    plt.show()
+```
+
+```python
+###### profiling point-in-polygon between "matplotlib" and "Polygon"
+pts = np.array([ [0,0], [6,0], [6,2], [3,2], [3,3], [3,0] ])
+mp = mapali.create_mpath(pts)
+pp = Polygon.Polygon(pts)
+
+tic = time.time()
+N = 100000
+for i in range(N):
+    mp.contains_points([[1,1]])
+print ( (time.time()-tic) /N ) #-> 6.56061887741e-06
+
+tic = time.time()
+N = 100000
+for i in range(N):
+    pp.isInside(1,1)
+print ( (time.time()-tic) /N ) #-> 3.37290763855e-07
+
+
+```
+
+```python
+###### profiling arrangement_match_score()
+from pycallgraph import PyCallGraph
+from pycallgraph.output import GraphvizOutput
+with PyCallGraph(output=GraphvizOutput()):
+    mapali.arrangement_match_score(arrange_src, arrange_dst, tf)
+
+# tic = time.time()
+# N = 10
+# for i in range(N):
+#     mapali.arrangement_match_score(arrange_src, arrange_dst, tf)
+# print ( (time.time()-tic) /N )
+
+```
+
+```python
+###### compute the area of intersection and union
+# NOTE:
+# Union and intersection area are computed by pixelating the paths, Obviously
+# this is an approximation.... 
+pixels_in_f1 = {tuple(p) for p in get_pixels_in_mpath(face1.path)}
+pixels_in_f2 = {tuple(p) for p in get_pixels_in_mpath(face2.path)}
+
+union = len( pixels_in_f1.union(pixels_in_f2) )
+intersection = len( pixels_in_f1.intersection(pixels_in_f2) )
+
+if union == 0:
+    # if one of the faces has the area equal to zero 
+    overlap_score = 0.
+else:    
+    # computing overlap ratio and score
+    # ratio and score \in [0,1]
+    overlap_ratio = float(intersection) / float(union)
+    overlap_score = (np.exp(overlap_ratio) - 1) / (np.e-1)
 ```
 
 ```python

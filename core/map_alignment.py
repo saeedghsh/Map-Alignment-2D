@@ -33,7 +33,6 @@ import matplotlib.path as mpath
 
 import Polygon#, Polygon.IO
 
-
 import arrangement.arrangement as arr
 # from . import mapali_plotting as maplt
 import mapali_plotting as maplt # this is used in the runMe.py
@@ -313,6 +312,79 @@ def oriented_minimum_bounding_box (points):
 
 
 ################################################################################
+def arrangement_match_score__Original(arrangement_src, arrangement_dst,
+                            tform,
+                            label_associations=None):
+    '''
+    tform:  a transformation instance of skimage lib
+    '''
+    # construct a matplotlib transformation instance (for transformation of paths )
+    aff2d = matplotlib.transforms.Affine2D( tform.params )
+
+    ### making a deepcopy of each arrangements, so not to disturb original copy
+    arrange_src = copy.deepcopy(arrangement_src)
+    arrange_dst = copy.deepcopy(arrangement_dst)
+
+    ### transforming paths of faces, and updating centre points 
+    faces_src = arrange_src.decomposition.faces
+    # faces_src = [ face for face in arrange_src.decomposition.faces if face.attributes['label_vote'] != -1]
+    for face in faces_src:
+        face.path = face.path.transformed(aff2d)
+        face.attributes['centre'] = np.mean(face.path.vertices[:-1,:], axis=0)
+
+    faces_dst = arrange_dst.decomposition.faces
+    # faces_dst = [ face for face in arrange_dst.decomposition.faces if face.attributes['label_vote'] != -1]
+    # for face in faces_dst: face.attributes['centre'] = np.mean(face.path.vertices[:-1,:], axis=0)
+    
+    # find face to face association
+    f2f_association = find_face2face_association(faces_src, faces_dst)
+
+    # find face to face match score (of associated faces)
+    f2f_match_score = {(f1_idx,f2f_association[f1_idx]): None
+                       for f1_idx in f2f_association.keys()}
+    for (f1_idx,f2_idx) in f2f_match_score.keys():
+        score = face_match_score(faces_src[f1_idx], faces_dst[f2_idx])
+        f2f_match_score[(f1_idx,f2_idx)] = score
+
+    # find the weights of pairs of associated faces to arrangement match score
+    face_pair_weight = {}
+    for (f1_idx,f2_idx) in f2f_match_score.keys():
+        # f1_area = faces_src[f1_idx].get_area()
+        # f2_area = faces_dst[f2_idx].get_area()
+    
+        # f1_w = float(f1_area) / float(arrange_src_area)
+        # f2_w = float(f2_area) / float(arrange_dst_area)
+        
+        # face_pair_weight[(f1_idx,f2_idx)] = np.min([f1_w, f2_w])
+        face_pair_weight[(f1_idx,f2_idx)] = np.min([faces_src[f1_idx].attributes['area_weight'],
+                                                    faces_dst[f2_idx].attributes['area_weight']])
+
+    # computing arrangement match score
+    if label_associations is None:
+        arr_score = np.sum([face_pair_weight[(f1_idx,f2_idx)]*f2f_match_score[(f1_idx,f2_idx)]
+                            for (f1_idx,f2_idx) in f2f_match_score.keys()])
+
+    elif label_associations is not None:
+        # find the face category label similarity
+        fpw = face_pair_weight
+        fms = f2f_match_score
+
+        fls = {} # face_label_similarity
+        for (f1_idx,f2_idx) in f2f_match_score.keys():
+            # fls[(f1_idx,f2_idx)] = face_category_distance(faces_src[f1_idx],
+            #                                               faces_dst[f2_idx],
+            #                                               label_associations=label_associations)
+            l1 = faces_src[f1_idx].attributes['label_vote']
+            l2 = faces_dst[f2_idx].attributes['label_vote']
+            fls[(f1_idx,f2_idx)] = 1 if label_associations[l1]==l2 else 0
+
+        arr_score = np.sum([ fls[(f1_idx,f2_idx)]*fpw[(f1_idx,f2_idx)]*fms[(f1_idx,f2_idx)]
+                             for (f1_idx,f2_idx) in f2f_match_score.keys()])
+
+
+    return arr_score
+
+################################################################################
 def find_face2face_association(faces_src, faces_dst, aff2d=None):
     '''
     problems:
@@ -361,84 +433,6 @@ def find_face2face_association(faces_src, faces_dst, aff2d=None):
     return f2f_association
 
 ################################################################################
-def arrangement_match_score(arrangement_src, arrangement_dst,
-                            tform,
-                            label_associations=None):
-    '''
-    tform:  a transformation instance of skimage lib
-    '''
-    # construct a matplotlib transformation instance (for transformation of paths )
-    aff2d = matplotlib.transforms.Affine2D( tform.params )
-
-    ### making a deepcopy of each arrangements, so not to disturb original copy
-    ### apparantely it is not needed and works alright without copy! 
-    ### because I already deepcopy them before passing to this method!
-    # arrange_src = copy.deepcopy(arrangement_src)
-    # arrange_dst = copy.deepcopy(arrangement_dst)
-    arrange_src = arrangement_src
-    arrange_dst = arrangement_dst
-
-    ### transforming paths of faces, and updating centre points 
-    faces_src = arrange_src.decomposition.faces
-    # faces_src = [ face for face in arrange_src.decomposition.faces if face.attributes['label_vote'] != -1]
-    for face in faces_src:
-        face.path = face.path.transformed(aff2d)
-        face.attributes['centre'] = np.mean(face.path.vertices[:-1,:], axis=0)
-
-    faces_dst = arrange_dst.decomposition.faces
-    # faces_dst = [ face for face in arrange_dst.decomposition.faces if face.attributes['label_vote'] != -1]
-    # for face in faces_dst: face.attributes['centre'] = np.mean(face.path.vertices[:-1,:], axis=0)
-    
-    # find face to face association
-    f2f_association = find_face2face_association(faces_src, faces_dst)#, aff2d)
-
-    # find face to face match score (of associated faces)
-    f2f_match_score = {(f1_idx,f2f_association[f1_idx]): None
-                       for f1_idx in f2f_association.keys()}
-    for (f1_idx,f2_idx) in f2f_match_score.keys():
-        score = face_match_score(faces_src[f1_idx], faces_dst[f2_idx])#, aff2d)
-        f2f_match_score[(f1_idx,f2_idx)] = score
-
-    # find the weights of pairs of associated faces to arrangement match score
-    face_pair_weight = {}
-    for (f1_idx,f2_idx) in f2f_match_score.keys():
-        # f1_area = faces_src[f1_idx].get_area()
-        # f2_area = faces_dst[f2_idx].get_area()
-    
-        # f1_w = float(f1_area) / float(arrange_src_area)
-        # f2_w = float(f2_area) / float(arrange_dst_area)
-        
-        # face_pair_weight[(f1_idx,f2_idx)] = np.min([f1_w, f2_w])
-        face_pair_weight[(f1_idx,f2_idx)] = np.min([faces_src[f1_idx].attributes['area_weight'],
-                                                    faces_dst[f2_idx].attributes['area_weight']])
-
-    # computing arrangement match score
-    if label_associations is None:
-        arr_score = np.sum([face_pair_weight[(f1_idx,f2_idx)]*f2f_match_score[(f1_idx,f2_idx)]
-                            for (f1_idx,f2_idx) in f2f_match_score.keys()])
-
-    elif label_associations is not None:
-        # find the face category label similarity
-        fpw = face_pair_weight
-        fms = f2f_match_score
-
-        fls = {} # face_label_similarity
-        for (f1_idx,f2_idx) in f2f_match_score.keys():
-            # fls[(f1_idx,f2_idx)] = face_category_distance(faces_src[f1_idx],
-            #                                               faces_dst[f2_idx],
-            #                                               label_associations=label_associations)
-            l1 = faces_src[f1_idx].attributes['label_vote']
-            l2 = faces_dst[f2_idx].attributes['label_vote']
-            fls[(f1_idx,f2_idx)] = 1 if label_associations[l1]==l2 else 0
-
-        arr_score = np.sum([ fls[(f1_idx,f2_idx)]*fpw[(f1_idx,f2_idx)]*fms[(f1_idx,f2_idx)]
-                             for (f1_idx,f2_idx) in f2f_match_score.keys()])
-
-
-    return arr_score
-
-
-################################################################################
 def face_match_score(face_src, face_dst, aff2d=None):
     '''
     NOTE
@@ -457,35 +451,115 @@ def face_match_score(face_src, face_dst, aff2d=None):
     p2 = Polygon.Polygon( [tuple(v) for v in face_dst.path.vertices] )
     union = p1 | p2
     intersection = p1 & p2
-    if union.area() == 0:
-        # if one of the faces has the area equal to zero 
-        return 0.
+
+    # if one of the faces has the area equal to zero 
+    if union.area() == 0: return 0.
 
     overlap_ratio = intersection.area() / union.area()
     overlap_score = (np.exp(overlap_ratio) - 1) / (np.e-1)
     return overlap_score
 
-    # # compute the area of intersection and union
-    # # NOTE
-    # # ----
-    # # Union and intersection area are computed by pixelating the paths, Obviously
-    # # this is an approximation.... 
-    # pixels_in_f1 = {tuple(p) for p in get_pixels_in_mpath(face1.path)}
-    # pixels_in_f2 = {tuple(p) for p in get_pixels_in_mpath(face2.path)}
 
-    # union = len( pixels_in_f1.union(pixels_in_f2) )
-    # intersection = len( pixels_in_f1.intersection(pixels_in_f2) )
 
-    # if union == 0:
-    #     # if one of the faces has the area equal to zero 
-    #     return 0.
 
-    # # computing overlap ratio and score
-    # # ratio and score \in [0,1]
-    # overlap_ratio = float(intersection) / float(union)
-    # overlap_score = (np.exp(overlap_ratio) - 1) / (np.e-1)
+################################################################################
+def arrangement_match_score(arrangement_src, arrangement_dst, tform):
+    '''
+    tform:  a transformation instance of skimage lib
+    '''
+    # construct a matplotlib transformation instance (for transformation of paths )
+    aff2d = matplotlib.transforms.Affine2D( tform.params )
 
-    # return overlap_score
+    arrange_src = arrangement_src
+    arrange_dst = arrangement_dst
+
+    ### transforming paths of faces, and updating centre points 
+    faces_src = arrange_src.decomposition.faces
+    faces_dst = arrange_dst.decomposition.faces
+    
+
+    ### find face to face association
+    faces_src_path = [face.path.transformed(aff2d) for face in faces_src]
+    faces_dst_path = [face.path for face in faces_dst]
+
+    faces_src_poly = [Polygon.Polygon(path.to_polygons()[0]) for path in faces_src_path]
+    faces_dst_poly = [Polygon.Polygon(path.to_polygons()[0]) for path in faces_dst_path]
+
+    face_area_src = np.array([poly.area() for poly in faces_src_poly])
+    face_area_dst = np.array([poly.area() for poly in faces_dst_poly])
+    # cdist expects 2d arrays as input, so I just convert the 1d area value
+    # to 2d vectors, all with one (or any aribitrary number)
+    face_area_src_2d = np.stack((face_area_src, np.ones((face_area_src.shape))),axis=1)
+    face_area_dst_2d = np.stack((face_area_dst, np.ones((face_area_dst.shape))),axis=1)
+    f2f_distance = scipy.spatial.distance.cdist(face_area_src_2d,
+                                                face_area_dst_2d,
+                                                'euclidean')
+
+    face_cen_src = np.array([poly.center() for poly in faces_src_poly])
+    face_cen_dst = np.array([poly.center() for poly in faces_dst_poly])
+        
+    f2f_association = {}
+    for src_idx in range(f2f_distance.shape[0]):
+        # if the centre of faces in dst are not inside the current face of src
+        # their distance are set to max, so that they become illegible
+        # TODO: should I also check for f_dst.path.contains_point(face_cen_src)
+
+        contained_in_src = faces_src_path[src_idx].contains_points(face_cen_dst)
+        contained_in_dst = [path_dst.contains_point(face_cen_src[src_idx])
+                            for path_dst in faces_dst_path]
+        contained = np.logical_and( contained_in_src, contained_in_dst)
+        if any(contained):
+            maxDist = f2f_distance[src_idx,:].max()
+            distances = np.where(contained,
+                                 f2f_distance[src_idx,:],
+                                 np.repeat(maxDist, contained.shape[0] ))
+            dst_idx = np.argmin(distances)
+            f2f_association[src_idx] = dst_idx
+        else:
+            # no face of destination has center inside the current face of src
+            pass
+
+
+    ### find face to face match score (of associated faces)
+    f2f_match_score = {(f1_idx,f2f_association[f1_idx]): None
+                       for f1_idx in f2f_association.keys()}
+    for (f1_idx,f2_idx) in f2f_match_score.keys():
+        poly_src = faces_src_poly[f1_idx]
+        poly_dst = faces_dst_poly[f2_idx]
+
+        union = poly_src | poly_dst
+        intersection = poly_src & poly_dst
+
+        # if one of the faces has the area equal to zero 
+        if union.area() == 0:
+            score =  0.
+        else:
+            overlap_ratio = intersection.area() / union.area()
+            overlap_score = (np.exp(overlap_ratio) - 1) / (np.e-1)
+            score = overlap_score
+
+        f2f_match_score[(f1_idx,f2_idx)] = score
+
+
+    ### find the weights of pairs of associated faces to arrangement match score
+    face_pair_weight = {}
+    for (f1_idx,f2_idx) in f2f_match_score.keys():
+        # f1_area = faces_src[f1_idx].get_area()
+        # f2_area = faces_dst[f2_idx].get_area()
+    
+        # f1_w = float(f1_area) / float(arrange_src_area)
+        # f2_w = float(f2_area) / float(arrange_dst_area)
+        
+        # face_pair_weight[(f1_idx,f2_idx)] = np.min([f1_w, f2_w])
+        face_pair_weight[(f1_idx,f2_idx)] = np.min([faces_src[f1_idx].attributes['area_weight'],
+                                                    faces_dst[f2_idx].attributes['area_weight']])
+
+    ### computing arrangement match score
+    arr_score = np.sum([face_pair_weight[(f1_idx,f2_idx)]*f2f_match_score[(f1_idx,f2_idx)]
+                        for (f1_idx,f2_idx) in f2f_match_score.keys()])
+
+
+    return arr_score
 
 
 ################################################################################
