@@ -127,9 +127,12 @@ def visualize(X, Y, ax):
 
 
 ################################################################################
-def plot_transformed_images(src, dst, tformM=None,
-                            axes=None, title=None,
-                            pts_to_draw=None ):
+def plot_transformed_images(images, keys,
+                            tformM=None,
+                            axes=None,
+                            title=None,
+                            pts_to_draw=None,
+                            save_to_file=False):
     '''
     src,dst (images 2darray)
 
@@ -149,6 +152,8 @@ def plot_transformed_images(src, dst, tformM=None,
     if pts_to_draw['mrk'] is not provided, marker is set to 'r,'
 
     '''
+
+    src, dst = images[keys[0]], images[keys[1]]
 
     aff2d = matplotlib.transforms.Affine2D( tformM )
     # aff2d._mtx == tformM
@@ -187,11 +192,16 @@ def plot_transformed_images(src, dst, tformM=None,
 
     if title is not None: axes.set_title(title)
 
+
     if return_axes:
         return axes
     else:
-        plt.tight_layout()
-        plt.show()
+        if save_to_file:
+            plt.savefig('_'.join(keys)+'.png', bbox_inches='tight')
+            plt.close(fig)
+        else:
+            plt.tight_layout()
+            plt.show()
 
 
 ################################################################################

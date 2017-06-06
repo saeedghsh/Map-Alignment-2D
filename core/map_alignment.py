@@ -1,6 +1,5 @@
 from __future__ import print_function
 
-
 # import sys
 # if sys.version_info[0] == 3:
 #     from importlib import reload
@@ -93,6 +92,123 @@ data_sets = {
 }
 
 ################################################################################
+def load_and_interpret (keys,
+                        arr_config,
+                        prun_dis_neighborhood,
+                        prun_dis_threshold,
+                        con_map_neighborhood,
+                        con_map_cross_thr,
+                        print_messages=True):
+
+    images, label_images, dis_images, skizs, traits = {}, {}, {}, {}, {}
+    arrangements, connectivity_maps = {}, {}
+
+    for key in keys:
+        if print_messages: print ('\t *** processing map \'{:s}\':'.format(key))
+        
+        ######################################## loading file
+        if print_messages: print ('\t loading files [image, label_image, skiz, triat_data] ...')
+        image, label_image, dis_image, skiz, trait = loader(data_sets[key])
+        images[key] = image
+        label_images[key] = label_image
+        dis_images[key] = dis_image
+        skizs[key] = skiz
+        traits[key] = trait
+
+        ######################################## deploying arrangement
+        if print_messages: print ('\t deploying arrangement ... ')
+        arrange = arr.Arrangement(trait, arr_config)
+        
+        ###############  distance based edge pruning
+        if print_messages: print ('\t arrangement pruning ... ')
+        set_edge_distance_value(arrange, dis_image, prun_dis_neighborhood)
+        arrange = prune_arrangement_with_distance(arrange, dis_image,
+                                                  neighborhood=prun_dis_neighborhood,
+                                                  distance_threshold=prun_dis_threshold)
+
+        ######################################## updating faces label
+        # due to the changes of the arrangement and faces
+        if print_messages: print ('\t update place categories to faces assignment ...')
+        arrange = assign_label_to_all_faces(arrange, label_image)
+        
+        ######################################## 
+        if print_messages: print ('\t setting ombb attribute of faces ...') 
+        arrange = set_ombb_of_faces (arrange)
+        
+        ######################################## 
+        if print_messages: print ('\t caching face area weight ...') 
+        superface = arrange._get_independent_superfaces()[0]
+        arrange_area = superface.get_area()
+        for face in arrange.decomposition.faces:
+            face.attributes['area_weight'] = float(face.get_area()) / float(arrange_area)
+
+        ######################################## construct conectivity map
+        if print_messages: print ('\t connectivity map construction and node profiling ...')
+        set_edge_crossing_attribute(arrange, skiz,
+                                    neighborhood=con_map_neighborhood,
+                                    cross_thr=con_map_cross_thr)
+        arrange, con_map = construct_connectivity_map(arrange, set_coordinates=True)
+
+        # profiling node, for finding label association with other maps
+        con_map = profile_nodes(con_map)
+        
+        ######################################## storing results
+        arrangements[key] = arrange
+        connectivity_maps[key] = con_map
+
+
+    return images, label_images, dis_images, skizs, arrangements, connectivity_maps
+
+
+################################################################################
+def hypothesis_generator(arrangements, images, keys,
+                         scale_mismatch_ratio_threshold=.5,
+                         scale_bounds=[.3, 3],#[.1, 10]
+                         connectivity_maps=None,
+                         print_messages=True):
+    '''
+    finds transformations between mbb of faces that are not outliers
+    similar_labels (default: ignore)
+    if similar_labels to be used, "connectivity_maps" should be passed here
+
+
+    parameters for "align_ombb()":
+    - tform_type='affine'
+
+    parameters for "reject_implausible_transformations()":
+    - scale_mismatch_ratio_threshold (default: 0.5)    
+    - scale_bounds (default: [.3, 3])
+
+    '''
+    
+    # label_associations = label_association(arrangements, connectivity_maps)
+    tforms = []
+    for face_src in arrangements[keys[0]].decomposition.faces:
+        for face_dst in arrangements[keys[1]].decomposition.faces:
+            src_not_outlier = face_src.attributes['label_vote'] != -1
+            dst_not_outlier = face_dst.attributes['label_vote'] != -1
+            similar_labels = True
+            # similar_labels = label_associations[ face_src.attributes['label_vote'] ] == face_dst.attributes['label_vote']
+            if src_not_outlier and src_not_outlier and similar_labels:
+                tforms.extend (align_ombb(face_src,face_dst, tform_type='affine'))
+
+    tforms = np.array(tforms)
+    if print_messages: print ( '\t totaly {:d} transformations estimated'.format(tforms.shape[0]) )
+    total_t = tforms.shape[0]
+    
+    tforms = reject_implausible_transformations( tforms,
+                                                 images[keys[0]].shape, images[keys[1]].shape,
+                                                 scale_mismatch_ratio_threshold,
+                                                 scale_bounds )
+
+    if print_messages: print ( '\t and {:d} transformations survived the rejections...'.format(tforms.shape[0]) )
+    # if tforms.shape[0] == 0: raise (NameError('no transformation survived.... '))
+    after_reject = tforms.shape[0]
+
+    return tforms, (total_t, after_reject)
+
+
+################################################################################
 def reject_implausible_transformations(transformations,
                                        image_src_shape, image_dst_shape,
                                        scale_mismatch_ratio_threshold=.1,
@@ -124,7 +240,7 @@ def reject_implausible_transformations(transformations,
     ### reject transformations with mismatching scale or extrem scales
     correct_scale_idx = []
     for idx,tf in enumerate(transformations):
-        if np.abs(tf.scale[0]-tf.scale[1])/np.min(tf.scale) < scale_mismatch_ratio_threshold:
+        if np.abs(tf.scale[0]-tf.scale[1])/np.mean(tf.scale) < scale_mismatch_ratio_threshold:
             if (scale_bounds[0] < tf.scale[0] < scale_bounds[1]):
                 correct_scale_idx.append(idx)
     # print ( 'scale_reject: {:d}'.format( len(transformations)-len(correct_scale_idx) ) )
@@ -150,6 +266,98 @@ def reject_implausible_transformations(transformations,
     
     return transformations
 
+################################################################################
+def select_winning_hypothesis(arrangements, keys,
+                              tforms, too_many_tforms=1000,
+                              dbscan_eps=0.051, dbscan_min_samples=2,
+                              print_messages=True ):
+    '''
+    input:
+    arrangements, keys
+    tforms
+
+    too_many_tforms = 1000
+    sklearn.cluster.DBSCAN(eps=0.051, min_samples=2)
+
+    output:
+    hypothesis
+    '''
+
+    if tforms.shape[0] < too_many_tforms:
+        if print_messages: print ('only {:d} tforms are estimated, so no clustering'.format(tforms.shape[0]))
+        
+        arr_match_score = {}
+        for idx, tf in enumerate(tforms):
+            arrange_src = arrangements[keys[0]]
+            arrange_dst = arrangements[keys[1]]
+            arr_match_score[idx] = arrangement_match_score(arrange_src, arrange_dst, tf)#, label_associations)
+            if print_messages: print ('match_score {:d}/{:d}: {:.4f}'.format(idx+1,tforms.shape[0], arr_match_score[idx]))
+
+        best_idx = max(arr_match_score, key=arr_match_score.get)
+        hypothesis = tforms[best_idx]
+        n_cluster = 0
+
+    else:
+        ################################ clustering transformations and winner selection
+
+        #################### feature scaling (standardization)
+        parameters = np.stack([ np.array( [tf.translation[0], tf.translation[1], tf.rotation, tf.scale[0] ] )
+                                for tf in tforms ], axis=0)
+        assert not np.any( np.isnan(parameters))
+        
+        # note that the scaling is only applied to parametes (for clustering),
+        # the transformations themselves are intact
+        parameters -= np.mean( parameters, axis=0 )
+        parameters /= np.std( parameters, axis=0 )
+        
+        #################### clustering pool into hypotheses
+        if print_messages: print ('\t clustering {:d} transformations'.format(parameters.shape[0]))
+        # min_s = max ([ 2, int( .05* np.min([ len(arrangements[key].decomposition.faces) for key in keys ]) ) ])
+        min_s = 2
+        cls = sklearn.cluster.DBSCAN(eps=dbscan_eps, min_samples=dbscan_min_samples)
+        cls.fit(parameters)
+        labels = cls.labels_
+        unique_labels = np.unique(labels)
+        if print_messages: print ( '\t *** total: {:d} clusters...'.format(unique_labels.shape[0]-1) )
+
+        ###  match_score for each cluster
+        arr_match_score = {}
+        for lbl in np.setdiff1d(unique_labels,[-1]):
+            class_member_idx = np.nonzero(labels == lbl)[0]
+            class_member = [ tforms[idx] for idx in class_member_idx ]
+            
+            # pick the one that is closest to all others in the same group
+            params = parameters[class_member_idx]
+            dist_mat = scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(params, 'euclidean'))
+            dist_arr = dist_mat.sum(axis=0)
+            tf = class_member[ np.argmin(dist_arr) ]
+            
+            arrange_src = arrangements[keys[0]]
+            arrange_dst = arrangements[keys[1]]
+            arr_match_score[lbl] = arrangement_match_score(arrange_src, arrange_dst, tf)#, label_associations)
+            if print_messages: print ('match score cluster {:d}/{:d}: {:.4f}'.format(lbl,len(unique_labels)-1, arr_match_score[lbl]) )
+
+        ### pick the winning cluster
+        winning_cluster_idx = max(arr_match_score, key=arr_match_score.get)
+        winning_cluster = [tforms[idx] for idx in np.nonzero(labels==winning_cluster_idx)[0]]
+
+        ### match_score for the entities of the winning cluster
+        arr_match_score = {}
+        for idx, tf in enumerate(winning_cluster):
+            arrange_src = arrangements[keys[0]]
+            arrange_dst = arrangements[keys[1]]
+            arr_match_score[idx] = arrangement_match_score(arrange_src, arrange_dst, tf)#, label_associations)
+            if print_messages: print ('match score element {:d}/{:d}: {:.4f}'.format(idx,len(winning_cluster)-1, arr_match_score[idx]) )
+
+        ### pick the wining cluster
+        hypothesis_idx = max(arr_match_score, key=arr_match_score.get)
+        hypothesis =  winning_cluster[hypothesis_idx]
+        
+        n_cluster = unique_labels.shape[0]-1
+
+    np.save('arr_match_score_'+'_'.join(keys)+'.npy', arr_match_score)
+
+    return hypothesis, n_cluster
 
 
 ################################################################################
