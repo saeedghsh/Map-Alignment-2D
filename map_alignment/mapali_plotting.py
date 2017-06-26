@@ -23,35 +23,36 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import matplotlib.transforms
 
-# note: whoever loads this module, must have added the path to arrangement
 import arrangement.plotting as aplt
 
 ################################################################################
 
-def plot_connectivity_map(axes, connectivity_map):
+def plot_connectivity_map(axes, connectivity_map, clr='g', alpha=.7):
+    '''
+    nodes of connectivity map must contain 'coordinate' key and corresponding value   
+    '''
     X,Y = zip( *[ connectivity_map.node[key]['coordinate']
                   for key in connectivity_map.node.keys() ] )
-    axes.plot(X,Y, 'go', alpha=.7)
+    axes.plot(X,Y, clr+'o', alpha=alpha)
     for (s,e,k) in connectivity_map.edges(keys=True):
         X,Y = zip( *[ connectivity_map.node[key]['coordinate']
                       for key in (s,e) ] )
-        axes.plot(X,Y, 'g-', alpha=.7)
+        axes.plot(X,Y, clr+'-', alpha=alpha)
     
     return axes
 
-########################################
-def plot_image(axes, image, alpha=1., cmap='gray'):
-    
-    return axes
-
-########################################
+################################################################################
 def plot_arrangement(axes, arrange, printLabels=False ):
+    '''
+    '''
     aplt.plot_edges (axes, arrange, alp=.3, col='b', printLabels=printLabels)
     aplt.plot_nodes (axes, arrange, alp=.5, col='r', printLabels=printLabels)
     return axes
 
 ################################################################################
 def plot_text_edge_occupancy(axes, arrange, attribute_key=['occupancy']):
+    '''
+    '''
     for s,e,k in arrange.graph.edges(keys=True):
         p1 = arrange.graph.node[s]['obj'].point
         p2 = arrange.graph.node[e]['obj'].point
@@ -66,10 +67,10 @@ def plot_text_edge_occupancy(axes, arrange, attribute_key=['occupancy']):
         axes.text( x+(dx/2), y+(dy/2), 
                    txt, fontdict={'color':'k',  'size': 10})
 
-
 ################################################################################
 def plot_place_categories (axes, arrangement, alpha=.5):
-
+    '''
+    '''
     clrs = ['k', 'm', 'y', 'c', 'b', 'r', 'g']
     
     for face in arrangement.decomposition.faces:
@@ -80,10 +81,10 @@ def plot_place_categories (axes, arrangement, alpha=.5):
                                    alpha=alpha)        
         axes.add_patch(patch)
 
-
 ########################################
 def plot_node_edge_occupancy_statistics(arrange, bins=30):
-    ''' '''
+    '''
+    '''
     edge_occ = np.array([ arrange.graph[s][e][k]['obj'].attributes['occupancy']
                           for (s,e,k) in arrange.graph.edges(keys=True) ]).astype(float)
 
@@ -113,9 +114,10 @@ def plot_node_edge_occupancy_statistics(arrange, bins=30):
     plt.tight_layout()
     plt.show()
 
-
 ########################################
 def plot_point_sets (src, dst=None):
+    '''
+    '''
     fig = plt.figure()
     fig.add_axes([0, 0, 1, 1])
     fig.axes[0].plot(src[:,0] ,  src[:,1], 'b.')
@@ -124,6 +126,7 @@ def plot_point_sets (src, dst=None):
     fig.axes[0].axis('equal')
     # fig.show() # using fig.show() won't block the code!
     plt.show()
+
 
 ################################################################################
 def visualize(X, Y, ax):
@@ -141,7 +144,6 @@ def visualize(X, Y, ax):
     ax.axis('equal')
     plt.draw()
     plt.pause(0.01**5)
-
 
 ################################################################################
 def plot_transformed_images(images, keys,
@@ -273,7 +275,8 @@ def histogram_of_alignment_parameters(parameters):
 ################################################################################
 def plot_face2face_association_match_score(arrange_src, arrange_dst,
                                            f2f_association, f2f_match_score):
-
+    '''
+    '''
     ### fetch the center of faces
     face_cen_src = np.array([face.attributes['centre']
                              for face in arrange_src.decomposition.faces])

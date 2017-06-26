@@ -9,7 +9,7 @@ Dependencies and Download
 
 ```shell
 # Download
-git clone https://github.com/saeedghsh/arrangement/
+git clone https://github.com/saeedghsh/Map-Alignment-2D.git
 cd arrangement
 
 # Install dependencies
@@ -28,17 +28,43 @@ But there are three more, namely [opencv](http://docs.opencv.org/trunk/d7/d9f/tu
 
 Usage Example
 -------------
+
+For simplicity and convenience, we assume both maps are provided as bitmap (occupancy grid maps).
+For more examples, see [Halmstad Map Collection](https://github.com/saeedghsh/xxx/).
 - Demo
 ```shell
-
+python demo.py --img_src 'tests/maps/map_src.png' --img_dst 'tests/maps/map_dst.png' -multiprocessing -visualize
 ```
+![example](https://github.com/saeedghsh/Map-Alignment-2D/blob/master/docs/maps_map_src__maps_map_dst.png)
 
-![animation](https://github.com/saeedghsh/arrangement/blob/master/docs/animation.gif)
 
+<!-- Parameters Setting -->
+<!-- ------------------ -->
+<!-- - lnl_config -->
+<!-- {'binary_threshold_1': 200, # with numpy - for SKIZ and distance -->
+<!-- 'binary_threshold_2': [100, 255], # with cv2 - for trait detection -->
+<!-- 'traits_from_file': False, # else provide yaml file name -->
+<!-- 'trait_detection_source': 'binary_inverted', -->
+<!-- 'edge_detection_config': [50, 150, 3], # thr1, thr2, apt_size -->
+<!-- 'peak_detect_sinogram_config': [15, 15, 0.15], # [refWin, minDist, minVal] -->
+<!-- 'orthogonal_orientations': True} # for dominant orientation detection -->
 
-Setting Of The Parameters
--------------------------
+<!-- - arr_config -->
+<!-- {'multi_processing':4, 'end_point':False, 'timing':False, -->
+<!-- 'prune_dis_neighborhood': 2, -->
+<!-- 'prune_dis_threshold': .075, # home:0.15 - office:0.075 -->
+<!-- 'occupancy_threshold': 200} # cell below this is considered occupied -->
 
+<!-- - hyp_config -->
+<!-- {'scale_mismatch_ratio_threshold': .3, # .5, -->
+<!-- 'scale_bounds': [.5, 2], #[.1, 10] -->
+<!-- 'face_occupancy_threshold': .5} -->
+    
+<!-- - sel_config -->
+<!-- {'multiprocessing': multiprocessing, -->
+<!-- 'too_many_tforms': 3000, -->
+<!-- 'dbscan_eps': 0.051, -->
+<!-- 'dbscan_min_samples': 2} -->
 
 
 License
@@ -53,6 +79,7 @@ This package has been developed to be employed as the underlying spatial represe
 
 Laundry List
 ------------
+- [ ] try out 3points distance for tforms and provide it precomputed to clustering.
 - [ ] move new methods from ```demo.py``` to ```mapali```.
 - [ ] remove unused methods from ```mapali``` and ```plotting```.
 - [ ] documentation.

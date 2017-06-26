@@ -20,7 +20,6 @@ from __future__ import print_function
 import numpy as np
 import scipy.signal
 
-
 ################################################################################
 ################################################################################
 ################################################################################
@@ -104,6 +103,8 @@ def FindPeaks (signal,
 
 ################################################################################
 def polar_distance(angle1, angle2, radian=False):
+    '''
+    '''
     dist = []
     if radian:    
         dist.append( np.abs(angle2 - angle1) )
@@ -121,16 +122,22 @@ def polarDistance(angle1, angle2, radian=True):
 
 ################################################################################
 def Euclidean_distance (P1, P2):
+    '''
+    '''
     return np.sqrt( np.sum([(P2[i]-P1[i])**2 for i in range(len(P1))]) )
 
 ################################################################################
 def Gauss1D(x, mu, s):
+    '''
+    '''
     coefficient = 1.0 / (s*np.sqrt(2*np.pi))
     y = np.exp(- (x-mu)**2 /(2.0 * s**2))
     return coefficient * y
 
 ################################################################################
 def Gauss2DNormal(Size, Sigma = 0.7, Normalize = '/sum'):
+    '''
+    '''
     # borrowed from: https://gist.github.com/andrewgiessel 
     # fwhm: full width at half maximum
     # fwhm = 2 * (sqrt(2*(ln(2)))) * sigma
@@ -151,9 +158,12 @@ def Gauss2DNormal(Size, Sigma = 0.7, Normalize = '/sum'):
 
 ################################################################################
 def GammaFilter (Size=3, Sigma=0.7, Order=1):
+    '''
+    '''
     GaussKernel = Gauss2DNormal(Size, Sigma, '/2*pi*sigma**2')
 
-    # TODO, Question: which direction is correct for dx? Actually why, since I know which direction!
+    # TODO, Question: which direction is correct for dx?
+    # Actually why, since I know which direction!
 
     dx = np.arange(Size/2, -Size/2, -1, float)
     dx = np.arange(-Size/2, Size/2, 1, float) + 1
