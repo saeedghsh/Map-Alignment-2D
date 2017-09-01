@@ -26,6 +26,129 @@ import matplotlib.transforms
 import arrangement.plotting as aplt
 
 ################################################################################
+################################################################################
+################################################################################
+def _visualize_save(src_results, dst_results, hypothesis,
+                    visualize=True, save_to_file=False, details=None):
+    '''
+    '''
+
+    fig, axes = plt.subplots(1,3, figsize=(20,12))
+
+    # src
+    axes[0].imshow(src_results['image'], cmap='gray', alpha=.7, interpolation='nearest', origin='lower')
+    plot_arrangement(axes[0], src_results['arrangement'], printLabels=False)
+    axes[0].set_title('source')
+
+    # dst
+    axes[1].imshow(dst_results['image'], cmap='gray', alpha=.7, interpolation='nearest', origin='lower')
+    plot_arrangement(axes[1], dst_results['arrangement'], printLabels=False)
+    axes[1].set_title('destination')
+
+    # result
+    aff2d = matplotlib.transforms.Affine2D( hypothesis.params )
+    im_dst = axes[2].imshow(dst_results['image'], origin='lower', cmap='gray', alpha=.5, clip_on=True)
+    im_src = axes[2].imshow(src_results['image'], origin='lower', cmap='gray', alpha=.5, clip_on=True)
+    im_src.set_transform( aff2d + axes[2].transData )
+    # finding the extent of of dst and transformed src
+    xmin_d,xmax_d, ymin_d,ymax_d = im_dst.get_extent()
+    x1, x2, y1, y2 = im_src.get_extent()
+    pts = [[x1,y1], [x2,y1], [x2,y2], [x1,y2]]
+    pts_tfrom = aff2d.transform(pts)    
+    xmin_s, xmax_s = np.min(pts_tfrom[:,0]), np.max(pts_tfrom[:,0]) 
+    ymin_s, ymax_s = np.min(pts_tfrom[:,1]), np.max(pts_tfrom[:,1])
+    axes[2].set_xlim( min(xmin_s,xmin_d), max(xmax_s,xmax_d) )
+    axes[2].set_ylim( min(ymin_s,ymin_d), max(ymax_s,ymax_d) )
+    axes[2].set_title('alignment')
+
+    if visualize and save_to_file:
+        np.save(save_to_file+'_details.npy', details)
+        plt.savefig(save_to_file+'.png', bbox_inches='tight')
+        plt.tight_layout()
+        plt.show()
+
+    elif visualize:
+        plt.tight_layout()
+        plt.show()
+
+    if save_to_file:
+        np.save(save_to_file+'_details.npy', details)
+        plt.savefig(save_to_file+'.png', bbox_inches='tight')
+        plt.close(fig)
+
+################################################################################
+def _visualize_save_2(src_results, dst_results, hypothesis,
+                      visualize=True, save_to_file=False, details=None):
+    ''''''
+    fig, axes = plt.subplots(2,2, figsize=(20,12))
+
+    # src
+    axes[0,0].set_title('source')
+    axes[0,0].imshow(src_results['image'], cmap='gray', alpha=.7, interpolation='nearest', origin='lower')
+    plot_arrangement(axes[0,0], src_results['arrangement'], printLabels=False)
+
+    # dst
+    axes[0,1].set_title('destination')
+    axes[0,1].imshow(dst_results['image'], cmap='gray', alpha=.7, interpolation='nearest', origin='lower')
+    plot_arrangement(axes[0,1], dst_results['arrangement'], printLabels=False)
+
+    # result
+    axes[1,0].set_title('alignment')
+    aff2d = matplotlib.transforms.Affine2D( hypothesis.params )
+    im_dst = axes[1,0].imshow(dst_results['image'], origin='lower', cmap='gray', alpha=.5, clip_on=True)
+    im_src = axes[1,0].imshow(src_results['image'], origin='lower', cmap='gray', alpha=.5, clip_on=True)
+    im_src.set_transform( aff2d + axes[1,0].transData )
+    # finding the extent of of dst and transformed src
+    xmin_d,xmax_d, ymin_d,ymax_d = im_dst.get_extent()
+    x1, x2, y1, y2 = im_src.get_extent()
+    pts = [[x1,y1], [x2,y1], [x2,y2], [x1,y2]]
+    pts_tfrom = aff2d.transform(pts)    
+    xmin_s, xmax_s = np.min(pts_tfrom[:,0]), np.max(pts_tfrom[:,0]) 
+    ymin_s, ymax_s = np.min(pts_tfrom[:,1]), np.max(pts_tfrom[:,1])
+    axes[1,0].set_xlim( min(xmin_s,xmin_d), max(xmax_s,xmax_d) )
+    axes[1,0].set_ylim( min(ymin_s,ymin_d), max(ymax_s,ymax_d) )
+
+    if 0:
+        axes[1,1].set_title('source image alignement with destination arrangement')
+        im_src = axes[1,1].imshow(src_results['image'], origin='lower', cmap='gray', alpha=.7, clip_on=True)
+        im_src.set_transform( aff2d + axes[1,1].transData )
+        plot_arrangement(axes[1,1], dst_results['arrangement'], printLabels=False)
+
+    if 1:
+        axes[1,1].set_title('source skiz alignement with destination skiz')
+        aff2d = matplotlib.transforms.Affine2D( hypothesis.params )
+
+        skiz_dst = axes[1,1].imshow(dst_results['skiz'], origin='lower', cmap='gray', alpha=.7, clip_on=True)
+        skiz_src = axes[1,1].imshow(src_results['skiz'], origin='lower', cmap='gray', alpha=.7, clip_on=True)
+        skiz_src.set_transform( aff2d + axes[1,1].transData )
+
+        im_dst = axes[1,1].imshow(dst_results['image'], origin='lower', cmap='gray', alpha=.5, clip_on=True)
+        im_src = axes[1,1].imshow(src_results['image'], origin='lower', cmap='gray', alpha=.5, clip_on=True)
+        im_src.set_transform( aff2d + axes[1,1].transData )
+
+        axes[1,1].set_xlim( min(xmin_s,xmin_d), max(xmax_s,xmax_d) )
+        axes[1,1].set_ylim( min(ymin_s,ymin_d), max(ymax_s,ymax_d) )
+
+    if visualize and save_to_file:
+        np.save(save_to_file+'_details.npy', details)
+        plt.savefig(save_to_file+'.png', bbox_inches='tight')
+        plt.tight_layout()
+        plt.show()
+
+    elif visualize:
+        plt.tight_layout()
+        plt.show()
+
+    if save_to_file:
+        np.save(save_to_file+'_details.npy', details)
+        plt.savefig(save_to_file+'.png', bbox_inches='tight')
+        plt.close(fig)
+
+
+################################################################################
+################################################################################
+################################################################################
+
 
 def plot_connectivity_map(axes, connectivity_map, clr='g', alpha=.7):
     '''

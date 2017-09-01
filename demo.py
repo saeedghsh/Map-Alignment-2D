@@ -30,55 +30,10 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 from map_alignment import map_alignment as mapali
+from map_alignment import mapali_plotting as maplt
 
 ################################################################################
 ################################################################################
-################################################################################
-def _visualize_save(src_results, dst_results, hypothesis,
-                    visualize=True, save_to_file=False, details=None):
-    '''
-    '''
-
-    fig, axes = plt.subplots(1,3, figsize=(20,12))
-
-    # src
-    axes[0].imshow(src_results['image'], cmap='gray', alpha=.7, interpolation='nearest', origin='lower')
-    mapali.maplt.plot_arrangement(axes[0], src_results['arrangement'], printLabels=False)
-
-    # dst
-    axes[1].imshow(dst_results['image'], cmap='gray', alpha=.7, interpolation='nearest', origin='lower')
-    mapali.maplt.plot_arrangement(axes[1], dst_results['arrangement'], printLabels=False)
-
-    # result
-    aff2d = matplotlib.transforms.Affine2D( hypothesis.params )
-    im_dst = axes[2].imshow(dst_results['image'], origin='lower', cmap='gray', alpha=.5, clip_on=True)
-    im_src = axes[2].imshow(src_results['image'], origin='lower', cmap='gray', alpha=.5, clip_on=True)
-    im_src.set_transform( aff2d + axes[2].transData )
-    # finding the extent of of dst and transformed src
-    xmin_d,xmax_d, ymin_d,ymax_d = im_dst.get_extent()
-    x1, x2, y1, y2 = im_src.get_extent()
-    pts = [[x1,y1], [x2,y1], [x2,y2], [x1,y2]]
-    pts_tfrom = aff2d.transform(pts)    
-    xmin_s, xmax_s = np.min(pts_tfrom[:,0]), np.max(pts_tfrom[:,0]) 
-    ymin_s, ymax_s = np.min(pts_tfrom[:,1]), np.max(pts_tfrom[:,1])
-    axes[2].set_xlim( min(xmin_s,xmin_d), max(xmax_s,xmax_d) )
-    axes[2].set_ylim( min(ymin_s,ymin_d), max(ymax_s,ymax_d) )
-
-    if visualize and save_to_file:
-        np.save(save_to_file+'_details.npy', details)
-        plt.savefig(save_to_file+'.png', bbox_inches='tight')
-        plt.tight_layout()
-        plt.show()
-
-    elif visualize:
-        plt.tight_layout()
-        plt.show()
-
-    if save_to_file:
-        np.save(save_to_file+'_details.npy', details)
-        plt.savefig(save_to_file+'.png', bbox_inches='tight')
-        plt.close(fig)
-
 ################################################################################
 def _extract_target_file_name(img_src, img_dst, method=None):
     '''
@@ -115,7 +70,6 @@ if __name__ == '__main__':
     considered open space. For SKIZ, distance transform, and face occupancy
     ratio, unexplored are considered as occupied and threshold is set to 200.
 
-
     example
     -------
     python demo.py --img_src 'tests/maps/map_src.png' --img_dst 'tests/maps/map_dst.png' -multiprocessing -visualize
@@ -147,10 +101,11 @@ if __name__ == '__main__':
     visualize = True if 'visualize' in options else False
     save_to_file = True if 'save_to_file' in options else False
 
-    out_file_name = _extract_target_file_name(img_src, img_dst)
-    save_to_file = out_file_name if save_to_file==True else False
+    # out_file_name = _extract_target_file_name(img_src, img_dst)
+    # save_to_file = out_file_name if save_to_file==True else False
     multiprocessing = True if 'multiprocessing' in options else False
 
+    
     ################################################################################
     print_messages = False
     
@@ -163,6 +118,15 @@ if __name__ == '__main__':
                   'peak_detect_sinogram_config': [15, 15, 0.15], # [refWin, minDist, minVal]
                   'orthogonal_orientations': True} # for dominant orientation detection
 
+
+    ########################################
+    # img_src = 'tests/maps/map_src.png'
+    # img_dst = 'tests/maps/map_dst.png'
+    multiprocessing = True
+    visualize = True
+    ########################################
+    
+    
     src_results, src_lnl_t = mapali._lock_n_load(img_src, lnl_config)
     dst_results, dst_lnl_t = mapali._lock_n_load(img_dst, lnl_config)
 
@@ -210,7 +174,8 @@ if __name__ == '__main__':
         'n_cluster': n_cluster
     }
 
-    _visualize_save(src_results, dst_results, hypothesis, visualize, save_to_file, details)
+    maplt._visualize_save(src_results, dst_results, hypothesis, visualize, save_to_file, details)
+    # maplt._visualize_save_2(src_results, dst_results, hypothesis, visualize, save_to_file, details)
 
     time_key = ['src_lnl_t', 'dst_lnl_t', 'src_arr_t', 'dst_arr_t', 'hyp_gen_t']
     print ('total time: {:.5f}'.format( np.array([details[key] for key in time_key]).sum() ) )

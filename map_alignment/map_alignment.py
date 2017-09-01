@@ -99,7 +99,8 @@ def _lock_n_load(file_name, config={}):
     ######################################## get skiz and distance image
     ## NOTE: this is the first binary conversion (see documentation of the method)
     thr = config['binary_thresholding_1']
-    bin_ = np.array( np.where( img < thr, 0, 255 ), dtype=np.uint8)
+    # bin_ = np.array( np.where( img < thr, 0, 255 ), dtype=np.uint8)
+    _, bin_ = cv2.threshold(img, thr, 255 , cv2.THRESH_BINARY)
     img_skiz, img_disance = _skiz_bitmap(bin_, invert=True, return_distance=True)
     
     # scaling distance image to [0, 255]
@@ -118,7 +119,7 @@ def _lock_n_load(file_name, config={}):
             trait_data = arr.utls.load_data_from_yaml( trait_file_name )   
             traits = trait_data['traits']
         else:
-            raise(NameError('loading traits from file only supports yaml (svg to come soon)'))
+            raise(StandardError('loading traits from file only supports yaml (svg to come soon)'))
 
     else:
 
@@ -146,6 +147,9 @@ def _lock_n_load(file_name, config={}):
             image = bin_img
             
         elif config['trait_detection_source'] == 'edge':
+            [thr1, thr2] = config['binary_thresholding_2']
+            print ('apt_size is set hard coded')
+            apt_size = 3
             edge_img = cv2.Canny(img, thr1, thr2, apt_size)
             image = edge_img
     
@@ -196,7 +200,7 @@ def _skiz_bitmap (image, invert=True, return_distance=False):
     > Morphology of the skiz
     '''
 
-    original = image.copy()
+    # original = image.copy()
 
     ###### image erosion to thicken the outline
     kernel = np.ones((9,9),np.uint8)
@@ -338,7 +342,7 @@ def _find_dominant_orientations(image,
 def _find_lines_with_radiography(image, orientations, peak_detect_config):
     '''
     '''
-    if len(orientations)==0: raise(NameError('No dominant orientation is available'))
+    if len(orientations)==0: raise(StandardError('No dominant orientation is available'))
     if peak_detect_config is None: peak_detect_config = [10, 15, 0.15]
 
     ### fetching setting for sinogram peak detection
@@ -423,12 +427,7 @@ def _construct_arrangement(data, config={}):
     ############### counting occupied cells in each face
     # if print_messages: print ('\t counting occupancy of faces ... ')
     # tic_= time.time()
-    for face in arrange.decomposition.faces:
-        pixels_in_path = _get_pixels_in_mpath(face.path, image_shape=data['image'].shape)
-        pixels_val = data['image'][pixels_in_path[:,1],pixels_in_path[:,0]]
-        total = float(pixels_val.shape[0])
-        occupied = float(np.count_nonzero(pixels_val < config['occupancy_threshold']))
-        face.attributes['occupancy'] = [occupied, total]
+    arrange = _set_face_occupancy_attribute(arrange, data['image'], config['occupancy_threshold'])
     # print ('counting occupancy of faces:{:.5f}'.format(time.time()-tic_))
 
     ######################################## 
@@ -464,7 +463,8 @@ def _set_edge_distance_value(arrangement, distance_image, neighborhood):
 
 ################################################################################
 def _prune_arrangement_with_distance(arrangement, distance_image,
-                                    neighborhood=2, distance_threshold=.075):
+                                     neighborhood=2,
+                                     distance_threshold=.075):
     '''
     '''
 
@@ -544,14 +544,14 @@ def _generate_hypothese(src_arr, src_img_shape,
     tforms_total = tforms.shape[0]
     
     tforms = _reject_implausible_transformations( tforms,
-                                                 src_img_shape, dst_img_shape,
-                                                 config['scale_mismatch_ratio_threshold'],
-                                                 config['scale_bounds'] )
+                                                  src_img_shape, dst_img_shape,
+                                                  config['scale_mismatch_ratio_threshold'],
+                                                  config['scale_bounds'] )
     elapsed_time = time.time() - tic
     tforms_after_reject = tforms.shape[0]
 
     # if print_messages: print ( '\t and {:d} transformations survived the rejections...'.format(tforms.shape[0]) )
-    # if tforms.shape[0] == 0: raise (NameError('no transformation survived.... '))
+    # if tforms.shape[0] == 0: raise (StandardError('no transformation survived.... '))
 
     return tforms, elapsed_time, tforms_total, tforms_after_reject # , (total_t, after_reject)
 
@@ -852,6 +852,14 @@ def _arrangement_match_score(arrangement_src, arrangement_dst, tform):
     ### computing arrangement match score
     arr_score = np.sum([face_pair_weight[(f1_idx,f2_idx)]*f2f_match_score[(f1_idx,f2_idx)]
                         for (f1_idx,f2_idx) in f2f_match_score.keys()])
+
+    # ################################# Experimental: to be removed
+    # # this should normalize match score for when the size of arrangements are not the same
+    # src_arr_area = arrangement_src._get_independent_superfaces()[0].get_area() * np.mean(tform.scale)
+    # dst_arr_area = arrangement_dst._get_independent_superfaces()[0].get_area()
+    # ratio = max([src_arr_area,dst_arr_area]) / min([src_arr_area,dst_arr_area])
+    # arr_score *= ratio
+    # ################################# Experimental: to be removed    
 
 
     return arr_score
@@ -1168,7 +1176,7 @@ def _pixel_neighborhood_of_halfedge (arrangement, (s,e,k),
     pt_2 = arrangement.graph.node[e]['obj'].point
 
     if not( isinstance(trait.obj, (sym.Line, sym.Segment, sym.Ray) ) ):
-        raise (NameError(' only line trait are supported for now '))
+        raise (StandardError(' only line trait are supported for now '))
     
     # Assuming only line segmnent - no arc-circle
     p1 = np.array([pt_1.x,pt_1.y]).astype(float)
@@ -1188,12 +1196,607 @@ def _pixel_neighborhood_of_halfedge (arrangement, (s,e,k),
 
 
 
+################################################################################
+######################################################### connectivity map stuff
+################################################################################
+def _set_face_occupancy_attribute(arrangement, image, occupancy_threshold=200):
+    '''
+    '''
+    for face in arrangement.decomposition.faces:
+        pixels_in_path = _get_pixels_in_mpath(face.path, image_shape=image.shape)
+        pixels_val = image[pixels_in_path[:,1],pixels_in_path[:,0]]
+        total = float(pixels_val.shape[0])
+        occupied = float(np.count_nonzero(pixels_val < occupancy_threshold))
+        face.attributes['occupancy'] = [occupied, total]
+    return arrangement
+
+################################################################################ arrangement attr setting
+def _set_face_centre_attribute(arrangement, source=['nodes','path'][0]):
+    '''
+    assumes all the faces in arrangement are convex
+    
+    if source == 'nodes' -> centre from nodes of arrangement
+    if source == 'path' -> centre from vertrices of the face
+    (for source == 'path', path must be up-todate)
+    '''
+    for face in arrangement.decomposition.faces:
+
+        if source == 'nodes':
+            nodes = [arrangement.graph.node[fn_idx]
+                     for fn_idx in face.get_all_nodes_Idx()]
+            xc = np.mean([ node['obj'].point.x for node in nodes ])
+            yc = np.mean([ node['obj'].point.y for node in nodes ])
+            face.attributes['centre'] = [float(xc),float(yc)]
+        elif source == 'path':
+            face.attributes['centre'] = np.mean(face.path.vertices[:-1,:], axis=0)
+
+################################################################################
+def _construct_connectivity_map(arrangement, set_coordinates=True):
+    '''
+
+    Parameter:
+    set_coordinates: Boolean (default:True)
+    assumes all the faces in arrangement are convex, and set the coordinate of
+    each corresponding node in the connectivity-map to the center of gravity of
+    the face's nodes
+
+    Note
+    ----
+    The keys to nodes in connectivity_map corresponds to 
+    face indices in the arrangement
+    '''
+
+    connectivity_map = nx.MultiGraph()
+
+    if set_coordinates: _set_face_centre_attribute(arrangement)
+    faces = arrangement.decomposition.faces
+
+    ########## node construction (one node per each face)
+    nodes = [ [f_idx, {}] for f_idx,face in enumerate(faces) ]
+    connectivity_map.add_nodes_from( nodes )
+
+    # assuming convex faces, node coordinate = COG (face.nodes)
+    if set_coordinates:
+        for f_idx,face in enumerate(faces):
+            connectivity_map.node[f_idx]['coordinate'] = face.attributes['centre']
+
+    ########## edge construction (add if faces are neighbor and connected)
+    corssed_halfedges = [ (s,e,k)
+                          for (s,e,k) in arrangement.graph.edges(keys=True)
+                          if arrangement.graph[s][e][k]['obj'].attributes['crossed'] ]
+
+    # todo: detecting topologically distict connection between face
+    # consider this:
+    # a square with a non-tangent circle enclosed and a vetical line in middle
+    # the square.substract(circle) region is split to two and they are connected
+    # through two topologically distict paths. hence, the graph of connectivity
+    # map must be multi. But if two faces are connected with different pairs of 
+    # half-edge that are adjacent, these connection pathes are not topologically
+    # distict, hence they should be treated as one connection
+
+    # todo: if the todo above is done, include it in dual_graph of the 
+    # arrangement
+
+    # for every pair of faces an edge is added if
+    # faces are neighbours and the shared-half_edges are crossed 
+    for (f1Idx,f2Idx) in itertools.combinations( range(len(faces)), 2):
+        mutualHalfEdges = arrangement.decomposition.find_mutual_halfEdges(f1Idx, f2Idx)
+        mutualHalfEdges = list( set(mutualHalfEdges).intersection(set(corssed_halfedges)) )
+        if len(mutualHalfEdges) > 0:
+            connectivity_map.add_edges_from( [ (f1Idx,f2Idx, {}) ] )
+            
+    return arrangement, connectivity_map
+
+
+################################################################################ arrangement attr setting
+def _set_edge_crossing_attribute(arrangement, skiz,
+                                neighborhood=3, cross_thr=12):
+    '''
+    Parameters
+    ----------
+    neighborhood = 5 # the bigger, I think the more robust it is wrt skiz-noise
+    cross_thr = 4 # seems a good guess! smaller also works
+    
+    Note
+    ----
+    skiz lines are usually about 3 pixel wide, so a proper edge crossing would
+    result in about (2*neighborhood) * 3pixels ~ 6*neighborhood
+    for safty, let's set it to 3*neighborhood
+
+    for a an insight to its distributions:
+    >>> plt.hist( [arrangement.graph[s][e][k]['obj'].attributes['skiz_crossing'][0]
+                   for (s,e,k) in arrangement.graph.edges(keys=True)],
+                  bins=30)
+    >>> plt.show()
+
+    Note
+    ----
+    since "_set_edge_occupancy" counts low_values as occupied,
+    (invert=True) must be set when calling the _skiz_bitmap 
+    '''
+
+    _set_edge_occupancy(arrangement,
+                        skiz, occupancy_thr=127,
+                        neighborhood=neighborhood,
+                        attribute_key='skiz_crossing')
+
+
+    for (s,e,k) in arrangement.graph.edges(keys=True):
+        o, n = arrangement.graph[s][e][k]['obj'].attributes['skiz_crossing']
+        arrangement.graph[s][e][k]['obj'].attributes['crossed'] = False if o <= cross_thr else True
+
+    # since the outer part of arrangement is all one face (Null),
+    # I'd rather not have any of the internal faces be connected with Null
+    # that might mess up the structure/topology of the connectivity graph
+    forbidden_edges  = arrangement.get_boundary_halfedges()
+    for (s,e,k) in forbidden_edges:
+        arrangement.graph[s][e][k]['obj'].attributes['crossed'] = False
+        (ts,te,tk) = arrangement.graph[s][e][k]['obj'].twinIdx
+        arrangement.graph[ts][te][tk]['obj'].attributes['crossed'] = False
+    # return skiz
+
+
+################################################################################ arrangement attr setting
+def _set_edge_occupancy(arrangement,
+                       image, occupancy_thr=200,
+                       neighborhood=10,
+                       attribute_key='occupancy'):
+    '''
+    This method sets the occupancy every edge in the arrangement wrt image:
+    arrangement.graph[s][e][k]['obj'].attributes[attribute_key] = [occupied, neighborhood_area]
+
+    Inputs
+    ------
+    arrangement:
+    The arrangement corresponding to the input image
+
+    image: bitmap (gray scale)
+    The image represensts the occupancy map and has high value for open space.
+
+
+    Parameters
+    ----------
+    occupancy_thr: default:200
+    Any pixel with value below "occupancy_thr" is considered occupied.
+
+    neighborhood: default=10
+    half the window size (ie disk radius) that defines the neighnorhood
+
+    attribute_key: default:'occupancy'
+    The key to attribute dictionary of the edges to store the 'occupancy'
+    This method is used for measuring occupancy of edges against occupancy map and skiz_map
+    Therefor it is important to store the result in the atrribute dictionary with proper key
+
+
+    Note
+    ----
+    "neighborhood_area" is dependant on the "neighborhood" parameter and the length of the edge.
+    Hence it is the different from edge to edge.
+    '''
+    for (s,e,k) in arrangement.graph.edges(keys=True):
+        neighbors = _pixel_neighborhood_of_halfedge (arrangement, (s,e,k),
+                                                     neighborhood,
+                                                     image_size=image.shape)
+
+        neighbors_val = image[neighbors[:,1], neighbors[:,0]]
+        occupied = np.nonzero(neighbors_val<occupancy_thr)[0]
+        
+        # if neighbors.shape[0] is zero, I will face division by zero
+        # when checking for occupancy ratio
+        o = occupied.shape[0]
+        n = np.max([1,neighbors.shape[0]])
+
+        arrangement.graph[s][e][k]['obj'].attributes[attribute_key] = [o, n]
+
+
 
 
 
 ################################################################################
 ###################################################################### old batch
 ################################################################################
+
+# ################################################################################
+# def get_mpath_area(path):
+#     '''
+#     move to arr.utls
+
+
+#     TODO:
+#     Isn't this based on the assumption that the path in convex?
+#     '''
+
+#     polygon = path.to_polygons()
+#     x = polygon[0][:,0]
+#     y = polygon[0][:,1]
+#     PolyArea = 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
+#     return PolyArea
+
+
+# ################################################################################
+# ############################################### place category label association
+# ################################################################################
+
+
+# ################################################################################
+# def label_association(arrangements, connectivity_maps):
+#     '''
+#     Inputs
+#     ------
+#     arrangements (dictionary)
+#     the keys are the map names and the values are arrangement instances of the maps
+
+#     connectivity_maps (dictionary)
+#     the keys are the map names and the values are connectivity map (graph) instances of the maps
+    
+
+#     Output
+#     ------
+#     association - (dictionary)
+#     the keys are the labels in the first map (the first key in the arrangements.keys()),
+#     and the values are the corresponding labels from the second map (the second key in the arrangements.keys())
+
+#     Note
+#     ----
+#     Assumption: number of categories are the same for both maps
+
+
+#     Note
+#     ----
+#     features is a dictionary, storing features of nodes in connectivity maps
+#     The keys of the features dictionary are: '{:s}_{:d}'.format(map_key, label)
+#     The labels are feteched from the labels of the corresponding faces in the arrangements
+#     So the features dictionary has kxl entries (k:number of maps, l:number of labels)
+
+#     For features[map_key_l], the value is a numpy.array of (nx2), where:
+#     n is the number nodes in the current map (map_key) with the same label (label==l)
+#     Features of nodes are their "degrees" and "load centralities".
+#     '''
+
+#     # assuming the number of cateogries are the same for both maps
+#     keys = arrangements.keys()
+#     f = arrangements[keys[0]].decomposition.faces[0]
+#     labels = [ int(k) for k in f.attributes['label_count'].keys() ]
+    
+#     # assuming label -1 is universal, we'll set it at the end
+#     labels.pop(labels.index(-1))
+
+#     ### constructing the "features" dictionary    
+#     features = {}
+#     for key in keys:
+#         for lbl in labels:
+#             fs = [ (connectivity_maps[key].node[n_idx]['features'][0], # degree
+#                     connectivity_maps[key].node[n_idx]['features'][3]) # load centrality
+#                    for n_idx in connectivity_maps[key].node.keys()
+#                    if arrangements[key].decomposition.faces[n_idx].attributes['label_vote'] == lbl]
+#             features['{:s}_{:d}'.format(key,lbl)] = np.array(fs)
+
+#     ### feature scaling (standardization)
+#     for key in keys:
+#         # std and mean of all features in current map (regardless of their place category labels) 
+#         # TD: should I standardize wrt (mean,std) of all maps?
+#         all_features = np.concatenate( [ features['{:s}_{:d}'.format(key,lbl)]
+#                                          for lbl in labels ] )
+#         std = np.std( all_features, axis=0 )
+#         mean = np.mean( all_features, axis=0 )
+        
+#         # standardizing all features
+#         for lbl in labels:
+#             features['{:s}_{:d}'.format(key,lbl)] -= mean
+#             features['{:s}_{:d}'.format(key,lbl)] /= std
+
+
+#     # ####################
+#     # #################### mode1 - no gaurantee for one to one association
+#     # ####################
+#     # # assuming label -1 is universal, we'll set it as default
+#     # associations = {-1:-1}
+#     # # finding associations between labels by minimum distance between their
+#     # # corresponding sets of feature
+#     # for lbl1 in labels:
+#     #     S1 = np.cov(  features['{:s}_{:d}'.format(keys[0], lbl1)], rowvar=False )
+#     #     U1 = np.mean( features['{:s}_{:d}'.format(keys[0], lbl1)], axis=0 )
+#     #     dist = [ bhattacharyya_distance (S1, U1,
+#     #                                      S2 = np.cov(  features['{:s}_{:d}'.format(keys[1], lbl2)], rowvar=False ),
+#     #                                      U2 = np.mean( features['{:s}_{:d}'.format(keys[1], lbl2)], axis=0 ) )
+#     #              for lbl2 in labels ]
+#     #     idx = dist.index(min(dist))
+#     #     associations[lbl1] = labels[idx]
+
+
+#     ####################
+#     #################### mode2 - gauranteed one to one association
+#     #################### 
+#     # row indices (lbl1) are labels of the source map
+#     # col indices (lbl2) are labels of the destination map
+#     dist = np.array([ [ bhattacharyya_distance(
+#         S1 = np.cov( features['{:s}_{:d}'.format(keys[0], lbl1)], rowvar=False),
+#         U1 = np.mean( features['{:s}_{:d}'.format(keys[0], lbl1)], axis=0),
+#         S2 = np.cov( features['{:s}_{:d}'.format(keys[1], lbl2)], rowvar=False),
+#         U2 = np.mean( features['{:s}_{:d}'.format(keys[1], lbl2)], axis=0)
+#     )[0,0]
+#                         for lbl1 in labels]
+#                       for lbl2 in labels ])
+    
+#     row_ind, col_ind = scipy.optimize.linear_sum_assignment(dist)
+#     associations = {lbl1:lbl2 for lbl1,lbl2 in zip(row_ind,col_ind)}
+#     # assuming label -1 is universal, we'll set it as default
+#     associations[-1] = -1
+
+
+#     return associations
+
+
+# ################################################################################
+# def bhattacharyya_distance (S1,U1, S2,U2):
+#     '''
+#     S: covariance matrix
+#     U: mean vector
+
+#     http://en.wikipedia.org/wiki/Bhattacharyya_distance
+#     '''
+
+#     # sometimes there is only one sample in the feature vector
+#     # and the resulting covariance is a single number (i.e invalide)
+#     if S1.shape!=(2,2) or np.linalg.det(S1)<np.spacing(10): S1 = np.eye(2)
+#     if S2.shape!=(2,2) or np.linalg.det(S2)<np.spacing(10): S2 = np.eye(2)
+
+#     S = (S1+S2) /2.0
+
+#     U1 = np.atleast_2d(U1)
+#     U2 = np.atleast_2d(U2)
+
+#     if U1.shape[0] > U1.shape[1]: # U1, U2 are (nx1)
+#         A = (1.0/8) *np.dot( (U1-U2).T, np.dot( np.linalg.inv(S), (U1-U2)) )
+#     else: #  # U1, U2  are (1xn)
+#         A = (1.0/8) *np.dot( (U1-U2), np.dot( np.linalg.inv(S), (U1-U2).T) )
+
+#     B = (1.0/2) *np.log( np.linalg.det(S) /np.sqrt(np.linalg.det(S1)*np.linalg.det(S2)) )
+
+#     return A+B
+
+
+# ################################################################################
+# def profile_nodes(graph):
+#     '''
+#     Note:
+#     nx.eigenvector_centrality - Not defined for multigraphs
+#     nx.katz_centralit - not implemented for multigraph
+#     nx.katz_centrality_numpy - not implemented for multigraph
+#     nx.current_flow_closeness_centrality - only for connected graphs
+#     nx.edge_betweenness_centrality - for edges
+#     '''
+
+#     # L = nx.laplacian_matrix(connectivity_maps[key])
+#     L = nx.normalized_laplacian_matrix(graph)
+#     eigenvalues = numpy.linalg.eigvals(L.A)
+    
+#     eigenvector_centrality = nx.eigenvector_centrality_numpy( graph )
+#     load_centrality = nx.load_centrality( graph)
+#     harmonic_centrality = nx.harmonic_centrality( graph )
+#     degree_centrality = nx.degree_centrality( graph )
+#     closeness_centrality = nx.closeness_centrality( graph )
+#     betweenness_centrality = nx.betweenness_centrality( graph )
+    
+
+#     for idx, key in enumerate( graph.node.keys() ):
+#         graph.node[key]['features'] = [
+#             graph.degree()[key],         # node degree
+#             eigenvalues[idx],            # node eigenvalue
+#             eigenvector_centrality[key], # node eigenvector centrality
+#             load_centrality[key],        # node load centrality
+#             harmonic_centrality[key],    # node harmonic centrality
+#             degree_centrality[key],      # node degree centrality
+#             closeness_centrality[key],   # node closeness centrality
+#             betweenness_centrality[key]  # node betweenness centrality
+#         ]
+
+#     return graph
+
+# ################################################################################
+# def assign_label_to_face(label_image, face, all_pixels=None):
+#     '''
+#     '''
+#     if all_pixels is None:
+#         x, y = np.meshgrid( np.arange(label_image.shape[1]),
+#                             np.arange(label_image.shape[0]))
+#         all_pixels = np.stack( (x.flatten(), y.flatten() ), axis=1)
+        
+        
+#     in_face = face.path.contains_points(all_pixels)
+#     pixels = all_pixels[in_face, :]
+
+#     if pixels.shape[0]==0:
+#         label = -1
+#         labels = { lbl: 0. for lbl in np.unique(label_image) }
+
+#     else:
+#         # mode=='vote'
+#         not_nan = np.nonzero( np.isnan(label_image[pixels[:,1],pixels[:,0]])==False )[0]
+#         label = np.median(label_image[pixels[:,1],pixels[:,0]][not_nan] )
+#         label = -1 if np.isnan(label) else label
+#         if label != int(label): #raise(StandardError('same number of labels - median is conf.'))
+#             label = int(label) #
+#             print('here is a face which confuses the median...')
+
+
+#         # mode=='count'
+#         total = float(pixels.shape[0])
+#         labels = { lbl: np.nonzero(label_image[pixels[:,1],pixels[:,0]]==lbl)[0].shape[0] /total
+#                    for lbl in np.unique(label_image)}
+#         # assert np.abs( np.sum([ labels[lbl] for lbl in labels.keys() ]) -1) < np.spacing(10**5)
+
+#     face.attributes['label_vote'] = label
+#     face.attributes['label_count'] = labels
+#     # return face
+
+
+# ################################################################################
+# def assign_label_to_all_faces(arrangement, label_image):
+#     '''
+#     attributes['label_vote'] (int)
+#     winner takes all. this contains a single value, that is the most common label in the face
+
+#     attributes['label_count'] (dictionary)
+#     per label in the label_image, there is a key in this dictionary
+#     the value to each key represents the presence of that label in the face (in percent [0,1]) 
+#     '''
+#     # note that all_pixels is in (col,row) format
+#     # use the same for "path.contains_points" and convert to (row,col) for
+#     # indexing the label_image
+#     x, y = np.meshgrid( np.arange(label_image.shape[1]),
+#                         np.arange(label_image.shape[0]))
+#     all_pixels = np.stack( (x.flatten(), y.flatten() ), axis=1)
+    
+#     for idx, face in enumerate(arrangement.decomposition.faces):
+#         # set face attributes ['label_vote'], ['label_count']
+#         assign_label_to_face(label_image, face, all_pixels=all_pixels)
+#         # can't set the following since faces is a tuple, and no need to
+#         # arrangement.decomposition.faces[idx] = face
+
+#     return arrangement    
+
+
+
+
+# ################################################################################
+# ###################################### face similarity based on place categories
+# ################################################################################
+
+# ################################################################################
+# def face_category_distance(face1,face2, label_associations=None):
+#     '''
+
+#     label_associations
+#     keys are the place category labels in face1
+#     values corresponding to each key are the place category labels in face2
+#     ie. lbl1 corresponds to lb2 <=> label_associations[lbl1]=lbl2
+#     if label_associations is None, a direct correspondance is assumed
+
+#     Note
+#     ----
+#     if label_associations is provided, it is assumed that the its keys correspond
+#     to face1.attributes['label_count'].keys() and the values in the
+#     label_associations correspond to face2.attributes['label_count'].keys()
+
+#     Note
+#     ----
+#     it is assumed that the number of place category labels in the two faces are
+#     the same;
+#     ie. len(face1.attributes['label_count']) == len(face2.attributes['label_count'])    
+#     '''
+
+#     # since the difference between lables in face1 and face2 might be non-empty
+#     # the sequence of if-elif will consider unique labels in each face
+#     # otherwise they could be set as np.array and compute distance faster.
+#     # w1 = face1.attributes['label_count']
+#     # w2 = face2.attributes['label_count']    
+#     # dis = 0		
+#     # for lbl in set( w1.keys()+w2.keys() ):
+#     #     if (lbl in w1) and (lbl in w2):
+#     #         dis += (w1[lbl]-w2[lbl])**2
+#     #     elif lbl in w1:
+#     #         dis += w1[lbl]**2
+#     #     elif lbl in w2:
+#     #         dis += w2[lbl]**2            
+#     # dis = np.sqrt( dis )
+
+#     w1 = face1.attributes['label_count']
+#     w2 = face2.attributes['label_count']
+
+#     if label_associations is None:
+#         # assuming a direct correspondance between w1.keys() and w2.keys()
+#         label_associations = {key:key for key in w1.keys()}
+
+#     w1_arr = np.array([ w1[key]
+#                         for key in label_associations.keys() ])
+#     w2_arr = np.array([ w2[label_associations[key]]
+#                         for key in label_associations.keys() ])
+
+#     dis = np.sqrt( np.sum( (w1_arr-w2_arr)**2 ) )
+
+#     return dis
+
+# ################################################################################
+# def are_same_category(face1,face2, label_associations=None, thr=.4):
+#     '''
+#     This method checks if the two input faces are similar according to 
+#     their place category label (count version)
+#     for the detials on the "count" version see: assign_label_to_face.__doc__
+
+#     Inputs
+#     ------
+#     face1, face2 ( Face instances )
+
+#     Parameters
+#     ----------
+#     label_associations (dictionary, default None)
+#     if the two faces belong to two different arrangments, there is no gaurantee
+#     that their labels correctly correspond to each other.
+#     to get label_associations, call the method "label_association()".
+#     If not provided (default None), it is assumed the two faces belong to the 
+#     same arrangement and there for the correspondance are direct.
+
+#     thr (float between (0,1), default: 0.4)
+#     If the distance between the category of faces is below this, the faces are
+#     assumed to belong to the same category
+
+#     Note
+#     ----
+#     It is required that the "assign_label_to_face()" method is called
+#     before calling this method.
+#     '''
+#     dis = face_category_distance( face1,face2, label_associations )    
+#     return True if dis<thr else False
+
+
+
+
+# ################################################################################
+# ##################################################### pretty much useless
+# ################################################################################
+
+# ################################################################################
+# def loader (png_name, n_categories=2):
+#     ''' Load files '''
+    
+#     yaml_name = png_name[:-3] + 'yaml'
+#     skiz_name = png_name[:-4] + '_skiz.png'
+#     ply_name = png_name[:-3] + 'ply'
+#     label_name = png_name[:-4]+'_labels_km{:s}.npy'.format(str(n_categories))    
+    
+#     dis_name = png_name[:-4] + '_dis.png'
+#     dis_name = png_name[:-4] + '_dis2.png'
+
+#     ### loading image and converting to binary 
+#     image = np.flipud( cv2.imread( png_name, cv2.IMREAD_GRAYSCALE) )
+#     thr1,thr2 = [200, 255]
+#     ret, image = cv2.threshold(image.astype(np.uint8) , thr1,thr2 , cv2.THRESH_BINARY)
+
+#     ### loading label_image
+#     label_image = np.load(label_name)
+
+#     ### loading distance image
+#     dis_image = np.flipud( cv2.imread(dis_name , cv2.IMREAD_GRAYSCALE) )
+
+#     ### laoding skiz image
+#     skiz = np.flipud( cv2.imread( skiz_name, cv2.IMREAD_GRAYSCALE) )    
+
+#     ### loading traits from yamls
+#     trait_data = arr.utls.load_data_from_yaml( yaml_name )   
+#     traits = trait_data['traits']
+#     boundary = trait_data['boundary']
+#     boundary[0] -= 20
+#     boundary[1] -= 20
+#     boundary[2] += 20
+#     boundary[3] += 20
+
+#     ### trimming traits
+#     traits = arr.utls.unbound_traits(traits)
+#     traits = arr.utls.bound_traits(traits, boundary)
+
+#     return image, label_image, dis_image, skiz, traits
+
 
 # ################################################################################
 # def load_and_interpret (keys,
@@ -1248,10 +1851,10 @@ def _pixel_neighborhood_of_halfedge (arrangement, (s,e,k),
 
 #         ######################################## construct conectivity map
 #         if print_messages: print ('\t connectivity map construction and node profiling ...')
-#         set_edge_crossing_attribute(arrange, skiz,
+#         _set_edge_crossing_attribute(arrange, skiz,
 #                                     neighborhood=con_map_neighborhood,
 #                                     cross_thr=con_map_cross_thr)
-#         arrange, con_map = construct_connectivity_map(arrange, set_coordinates=True)
+#         arrange, con_map = _construct_connectivity_map(arrange, set_coordinates=True)
 
 #         # profiling node, for finding label association with other maps
 #         con_map = profile_nodes(con_map)
@@ -1304,7 +1907,7 @@ def _pixel_neighborhood_of_halfedge (arrangement, (s,e,k),
 #                                                  scale_bounds )
 
 #     if print_messages: print ( '\t and {:d} transformations survived the rejections...'.format(tforms.shape[0]) )
-#     # if tforms.shape[0] == 0: raise (NameError('no transformation survived.... '))
+#     # if tforms.shape[0] == 0: raise (StandardError('no transformation survived.... '))
 #     after_reject = tforms.shape[0]
 
 #     return tforms, (total_t, after_reject)
@@ -1646,566 +2249,3 @@ def _pixel_neighborhood_of_halfedge (arrangement, (s,e,k),
     
 #     if 1: print(mse, l2)
 #     return  mse, l2  # * overlap_error
-
-# ################################################################################
-# def get_mpath_area(path):
-#     '''
-#     move to arr.utls
-
-
-#     TODO:
-#     Isn't this based on the assumption that the path in convex?
-#     '''
-
-#     polygon = path.to_polygons()
-#     x = polygon[0][:,0]
-#     y = polygon[0][:,1]
-#     PolyArea = 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
-#     return PolyArea
-
-
-
-
-# ################################################################################
-# def label_association(arrangements, connectivity_maps):
-#     '''
-#     Inputs
-#     ------
-#     arrangements (dictionary)
-#     the keys are the map names and the values are arrangement instances of the maps
-
-#     connectivity_maps (dictionary)
-#     the keys are the map names and the values are connectivity map (graph) instances of the maps
-    
-
-#     Output
-#     ------
-#     association - (dictionary)
-#     the keys are the labels in the first map (the first key in the arrangements.keys()),
-#     and the values are the corresponding labels from the second map (the second key in the arrangements.keys())
-
-#     Note
-#     ----
-#     Assumption: number of categories are the same for both maps
-
-
-#     Note
-#     ----
-#     features is a dictionary, storing features of nodes in connectivity maps
-#     The keys of the features dictionary are: '{:s}_{:d}'.format(map_key, label)
-#     The labels are feteched from the labels of the corresponding faces in the arrangements
-#     So the features dictionary has kxl entries (k:number of maps, l:number of labels)
-
-#     For features[map_key_l], the value is a numpy.array of (nx2), where:
-#     n is the number nodes in the current map (map_key) with the same label (label==l)
-#     Features of nodes are their "degrees" and "load centralities".
-#     '''
-
-#     # assuming the number of cateogries are the same for both maps
-#     keys = arrangements.keys()
-#     f = arrangements[keys[0]].decomposition.faces[0]
-#     labels = [ int(k) for k in f.attributes['label_count'].keys() ]
-    
-#     # assuming label -1 is universal, we'll set it at the end
-#     labels.pop(labels.index(-1))
-
-#     ### constructing the "features" dictionary    
-#     features = {}
-#     for key in keys:
-#         for lbl in labels:
-#             fs = [ (connectivity_maps[key].node[n_idx]['features'][0], # degree
-#                     connectivity_maps[key].node[n_idx]['features'][3]) # load centrality
-#                    for n_idx in connectivity_maps[key].node.keys()
-#                    if arrangements[key].decomposition.faces[n_idx].attributes['label_vote'] == lbl]
-#             features['{:s}_{:d}'.format(key,lbl)] = np.array(fs)
-
-#     ### feature scaling (standardization)
-#     for key in keys:
-#         # std and mean of all features in current map (regardless of their place category labels) 
-#         # TD: should I standardize wrt (mean,std) of all maps?
-#         all_features = np.concatenate( [ features['{:s}_{:d}'.format(key,lbl)]
-#                                          for lbl in labels ] )
-#         std = np.std( all_features, axis=0 )
-#         mean = np.mean( all_features, axis=0 )
-        
-#         # standardizing all features
-#         for lbl in labels:
-#             features['{:s}_{:d}'.format(key,lbl)] -= mean
-#             features['{:s}_{:d}'.format(key,lbl)] /= std
-
-
-#     # ####################
-#     # #################### mode1 - no gaurantee for one to one association
-#     # ####################
-#     # # assuming label -1 is universal, we'll set it as default
-#     # associations = {-1:-1}
-#     # # finding associations between labels by minimum distance between their
-#     # # corresponding sets of feature
-#     # for lbl1 in labels:
-#     #     S1 = np.cov(  features['{:s}_{:d}'.format(keys[0], lbl1)], rowvar=False )
-#     #     U1 = np.mean( features['{:s}_{:d}'.format(keys[0], lbl1)], axis=0 )
-#     #     dist = [ bhattacharyya_distance (S1, U1,
-#     #                                      S2 = np.cov(  features['{:s}_{:d}'.format(keys[1], lbl2)], rowvar=False ),
-#     #                                      U2 = np.mean( features['{:s}_{:d}'.format(keys[1], lbl2)], axis=0 ) )
-#     #              for lbl2 in labels ]
-#     #     idx = dist.index(min(dist))
-#     #     associations[lbl1] = labels[idx]
-
-
-#     ####################
-#     #################### mode2 - gauranteed one to one association
-#     #################### 
-#     # row indices (lbl1) are labels of the source map
-#     # col indices (lbl2) are labels of the destination map
-#     dist = np.array([ [ bhattacharyya_distance(
-#         S1 = np.cov( features['{:s}_{:d}'.format(keys[0], lbl1)], rowvar=False),
-#         U1 = np.mean( features['{:s}_{:d}'.format(keys[0], lbl1)], axis=0),
-#         S2 = np.cov( features['{:s}_{:d}'.format(keys[1], lbl2)], rowvar=False),
-#         U2 = np.mean( features['{:s}_{:d}'.format(keys[1], lbl2)], axis=0)
-#     )[0,0]
-#                         for lbl1 in labels]
-#                       for lbl2 in labels ])
-    
-#     row_ind, col_ind = scipy.optimize.linear_sum_assignment(dist)
-#     associations = {lbl1:lbl2 for lbl1,lbl2 in zip(row_ind,col_ind)}
-#     # assuming label -1 is universal, we'll set it as default
-#     associations[-1] = -1
-
-
-#     return associations
-
-
-# ################################################################################
-# def bhattacharyya_distance (S1,U1, S2,U2):
-#     '''
-#     S: covariance matrix
-#     U: mean vector
-
-#     http://en.wikipedia.org/wiki/Bhattacharyya_distance
-#     '''
-
-#     # sometimes there is only one sample in the feature vector
-#     # and the resulting covariance is a single number (i.e invalide)
-#     if S1.shape!=(2,2) or np.linalg.det(S1)<np.spacing(10): S1 = np.eye(2)
-#     if S2.shape!=(2,2) or np.linalg.det(S2)<np.spacing(10): S2 = np.eye(2)
-
-#     S = (S1+S2) /2.0
-
-#     U1 = np.atleast_2d(U1)
-#     U2 = np.atleast_2d(U2)
-
-#     if U1.shape[0] > U1.shape[1]: # U1, U2 are (nx1)
-#         A = (1.0/8) *np.dot( (U1-U2).T, np.dot( np.linalg.inv(S), (U1-U2)) )
-#     else: #  # U1, U2  are (1xn)
-#         A = (1.0/8) *np.dot( (U1-U2), np.dot( np.linalg.inv(S), (U1-U2).T) )
-
-#     B = (1.0/2) *np.log( np.linalg.det(S) /np.sqrt(np.linalg.det(S1)*np.linalg.det(S2)) )
-
-#     return A+B
-
-
-# ################################################################################
-# def profile_nodes(graph):
-#     '''
-#     Note:
-#     nx.eigenvector_centrality - Not defined for multigraphs
-#     nx.katz_centralit - not implemented for multigraph
-#     nx.katz_centrality_numpy - not implemented for multigraph
-#     nx.current_flow_closeness_centrality - only for connected graphs
-#     nx.edge_betweenness_centrality - for edges
-#     '''
-
-#     # L = nx.laplacian_matrix(connectivity_maps[key])
-#     L = nx.normalized_laplacian_matrix(graph)
-#     eigenvalues = numpy.linalg.eigvals(L.A)
-    
-#     eigenvector_centrality = nx.eigenvector_centrality_numpy( graph )
-#     load_centrality = nx.load_centrality( graph)
-#     harmonic_centrality = nx.harmonic_centrality( graph )
-#     degree_centrality = nx.degree_centrality( graph )
-#     closeness_centrality = nx.closeness_centrality( graph )
-#     betweenness_centrality = nx.betweenness_centrality( graph )
-    
-
-#     for idx, key in enumerate( graph.node.keys() ):
-#         graph.node[key]['features'] = [
-#             graph.degree()[key],         # node degree
-#             eigenvalues[idx],            # node eigenvalue
-#             eigenvector_centrality[key], # node eigenvector centrality
-#             load_centrality[key],        # node load centrality
-#             harmonic_centrality[key],    # node harmonic centrality
-#             degree_centrality[key],      # node degree centrality
-#             closeness_centrality[key],   # node closeness centrality
-#             betweenness_centrality[key]  # node betweenness centrality
-#         ]
-
-#     return graph
-
-# ################################################################################
-# def assign_label_to_face(label_image, face, all_pixels=None):
-#     '''
-#     '''
-#     if all_pixels is None:
-#         x, y = np.meshgrid( np.arange(label_image.shape[1]),
-#                             np.arange(label_image.shape[0]))
-#         all_pixels = np.stack( (x.flatten(), y.flatten() ), axis=1)
-        
-        
-#     in_face = face.path.contains_points(all_pixels)
-#     pixels = all_pixels[in_face, :]
-
-#     if pixels.shape[0]==0:
-#         label = -1
-#         labels = { lbl: 0. for lbl in np.unique(label_image) }
-
-#     else:
-#         # mode=='vote'
-#         not_nan = np.nonzero( np.isnan(label_image[pixels[:,1],pixels[:,0]])==False )[0]
-#         label = np.median(label_image[pixels[:,1],pixels[:,0]][not_nan] )
-#         label = -1 if np.isnan(label) else label
-#         if label != int(label): #raise(NameError('same number of labels - median is conf.'))
-#             label = int(label) #
-#             print('here is a face which confuses the median...')
-
-
-#         # mode=='count'
-#         total = float(pixels.shape[0])
-#         labels = { lbl: np.nonzero(label_image[pixels[:,1],pixels[:,0]]==lbl)[0].shape[0] /total
-#                    for lbl in np.unique(label_image)}
-#         # assert np.abs( np.sum([ labels[lbl] for lbl in labels.keys() ]) -1) < np.spacing(10**5)
-
-#     face.attributes['label_vote'] = label
-#     face.attributes['label_count'] = labels
-#     # return face
-
-
-# ################################################################################
-# def assign_label_to_all_faces(arrangement, label_image):
-#     '''
-#     attributes['label_vote'] (int)
-#     winner takes all. this contains a single value, that is the most common label in the face
-
-#     attributes['label_count'] (dictionary)
-#     per label in the label_image, there is a key in this dictionary
-#     the value to each key represents the presence of that label in the face (in percent [0,1]) 
-#     '''
-#     # note that all_pixels is in (col,row) format
-#     # use the same for "path.contains_points" and convert to (row,col) for
-#     # indexing the label_image
-#     x, y = np.meshgrid( np.arange(label_image.shape[1]),
-#                         np.arange(label_image.shape[0]))
-#     all_pixels = np.stack( (x.flatten(), y.flatten() ), axis=1)
-    
-#     for idx, face in enumerate(arrangement.decomposition.faces):
-#         # set face attributes ['label_vote'], ['label_count']
-#         assign_label_to_face(label_image, face, all_pixels=all_pixels)
-#         # can't set the following since faces is a tuple, and no need to
-#         # arrangement.decomposition.faces[idx] = face
-
-#     return arrangement    
-
-# ################################################################################
-# def face_category_distance(face1,face2, label_associations=None):
-#     '''
-
-#     label_associations
-#     keys are the place category labels in face1
-#     values corresponding to each key are the place category labels in face2
-#     ie. lbl1 corresponds to lb2 <=> label_associations[lbl1]=lbl2
-#     if label_associations is None, a direct correspondance is assumed
-
-#     Note
-#     ----
-#     if label_associations is provided, it is assumed that the its keys correspond
-#     to face1.attributes['label_count'].keys() and the values in the
-#     label_associations correspond to face2.attributes['label_count'].keys()
-
-#     Note
-#     ----
-#     it is assumed that the number of place category labels in the two faces are
-#     the same;
-#     ie. len(face1.attributes['label_count']) == len(face2.attributes['label_count'])    
-#     '''
-
-#     # since the difference between lables in face1 and face2 might be non-empty
-#     # the sequence of if-elif will consider unique labels in each face
-#     # otherwise they could be set as np.array and compute distance faster.
-#     # w1 = face1.attributes['label_count']
-#     # w2 = face2.attributes['label_count']    
-#     # dis = 0		
-#     # for lbl in set( w1.keys()+w2.keys() ):
-#     #     if (lbl in w1) and (lbl in w2):
-#     #         dis += (w1[lbl]-w2[lbl])**2
-#     #     elif lbl in w1:
-#     #         dis += w1[lbl]**2
-#     #     elif lbl in w2:
-#     #         dis += w2[lbl]**2            
-#     # dis = np.sqrt( dis )
-
-#     w1 = face1.attributes['label_count']
-#     w2 = face2.attributes['label_count']
-
-#     if label_associations is None:
-#         # assuming a direct correspondance between w1.keys() and w2.keys()
-#         label_associations = {key:key for key in w1.keys()}
-
-#     w1_arr = np.array([ w1[key]
-#                         for key in label_associations.keys() ])
-#     w2_arr = np.array([ w2[label_associations[key]]
-#                         for key in label_associations.keys() ])
-
-#     dis = np.sqrt( np.sum( (w1_arr-w2_arr)**2 ) )
-
-#     return dis
-
-# ################################################################################
-# def are_same_category(face1,face2, label_associations=None, thr=.4):
-#     '''
-#     This method checks if the two input faces are similar according to 
-#     their place category label (count version)
-#     for the detials on the "count" version see: assign_label_to_face.__doc__
-
-#     Inputs
-#     ------
-#     face1, face2 ( Face instances )
-
-#     Parameters
-#     ----------
-#     label_associations (dictionary, default None)
-#     if the two faces belong to two different arrangments, there is no gaurantee
-#     that their labels correctly correspond to each other.
-#     to get label_associations, call the method "label_association()".
-#     If not provided (default None), it is assumed the two faces belong to the 
-#     same arrangement and there for the correspondance are direct.
-
-#     thr (float between (0,1), default: 0.4)
-#     If the distance between the category of faces is below this, the faces are
-#     assumed to belong to the same category
-
-#     Note
-#     ----
-#     It is required that the "assign_label_to_face()" method is called
-#     before calling this method.
-#     '''
-#     dis = face_category_distance( face1,face2, label_associations )    
-#     return True if dis<thr else False
-
-# ################################################################################
-# def set_face_centre_attribute(arrangement,
-#                               source=['nodes','path'][0]):
-#     '''
-#     assumes all the faces in arrangement are convex
-    
-#     if source == 'nodes' -> centre from nodes of arrangement
-#     if source == 'path' -> centre from vertrices of the face
-#     (for source == 'path', path must be up-todate)
-#     '''
-#     for face in arrangement.decomposition.faces:
-
-#         if source == 'nodes':
-#             nodes = [arrangement.graph.node[fn_idx]
-#                      for fn_idx in face.get_all_nodes_Idx()]
-#             xc = np.mean([ node['obj'].point.x for node in nodes ])
-#             yc = np.mean([ node['obj'].point.y for node in nodes ])
-#             face.attributes['centre'] = [float(xc),float(yc)]
-#         elif source == 'path':
-#             face.attributes['centre'] = np.mean(face.path.vertices[:-1,:], axis=0)
-
-# ################################################################################
-# def construct_connectivity_map(arrangement, set_coordinates=True):
-#     '''
-
-#     Parameter:
-#     set_coordinates: Boolean (default:True)
-#     assumes all the faces in arrangement are convex, and set the coordinate of
-#     each corresponding node in the connectivity-map to the center of gravity of
-#     the face's nodes
-
-#     Note
-#     ----
-#     The keys to nodes in connectivity_map corresponds to 
-#     face indices in the arrangement
-#     '''
-
-#     connectivity_map = nx.MultiGraph()
-
-#     if set_coordinates: set_face_centre_attribute(arrangement)
-#     faces = arrangement.decomposition.faces
-
-#     ########## node construction (one node per each face)
-#     nodes = [ [f_idx, {}] for f_idx,face in enumerate(faces) ]
-#     connectivity_map.add_nodes_from( nodes )
-
-#     # assuming convex faces, node coordinate = COG (face.nodes)
-#     if set_coordinates:
-#         for f_idx,face in enumerate(faces):
-#             connectivity_map.node[f_idx]['coordinate'] = face.attributes['centre']
-
-#     ########## edge construction (add if faces are neighbor and connected)
-#     corssed_halfedges = [ (s,e,k)
-#                           for (s,e,k) in arrangement.graph.edges(keys=True)
-#                           if arrangement.graph[s][e][k]['obj'].attributes['crossed'] ]
-
-#     # todo: detecting topologically distict connection between face
-#     # consider this:
-#     # a square with a non-tangent circle enclosed and a vetical line in middle
-#     # the square.substract(circle) region is split to two and they are connected
-#     # through two topologically distict paths. hence, the graph of connectivity
-#     # map must be multi. But if two faces are connected with different pairs of 
-#     # half-edge that are adjacent, these connection pathes are not topologically
-#     # distict, hence they should be treated as one connection
-
-#     # todo: if the todo above is done, include it in dual_graph of the 
-#     # arrangement
-
-#     # for every pair of faces an edge is added if
-#     # faces are neighbours and the shared-half_edges are crossed 
-#     for (f1Idx,f2Idx) in itertools.combinations( range(len(faces) ), 2):
-#         mutualHalfEdges = arrangement.decomposition.find_mutual_halfEdges(f1Idx, f2Idx)
-#         mutualHalfEdges = list( set(mutualHalfEdges).intersection(set(corssed_halfedges)) )
-#         if len(mutualHalfEdges) > 0:
-#             connectivity_map.add_edges_from( [ (f1Idx,f2Idx, {}) ] )
-            
-#     return arrangement, connectivity_map
-
-
-# ################################################################################
-# def set_edge_crossing_attribute(arrangement, skiz,
-#                                 neighborhood=3, cross_thr=12):
-#     '''
-#     Parameters
-#     ----------
-#     neighborhood = 5 # the bigger, I think the more robust it is wrt skiz-noise
-#     cross_thr = 4 # seems a good guess! smaller also works
-    
-#     Note
-#     ----
-#     skiz lines are usually about 3 pixel wide, so a proper edge crossing would
-#     result in about (2*neighborhood) * 3pixels ~ 6*neighborhood
-#     for safty, let's set it to 3*neighborhood
-
-#     for a an insight to its distributions:
-#     >>> plt.hist( [arrangement.graph[s][e][k]['obj'].attributes['skiz_crossing'][0]
-#                    for (s,e,k) in arrangement.graph.edges(keys=True)],
-#                   bins=30)
-#     >>> plt.show()
-
-#     Note
-#     ----
-#     since "set_edge_occupancy" counts low_values as occupied,
-#     (invert=True) must be set when calling the _skiz_bitmap 
-#     '''
-
-#     set_edge_occupancy(arrangement,
-#                        skiz, occupancy_thr=127,
-#                        neighborhood=neighborhood,
-#                        attribute_key='skiz_crossing')
-
-
-#     for (s,e,k) in arrangement.graph.edges(keys=True):
-#         o, n = arrangement.graph[s][e][k]['obj'].attributes['skiz_crossing']
-#         arrangement.graph[s][e][k]['obj'].attributes['crossed'] = False if o <= cross_thr else True
-
-#     # since the outer part of arrangement is all one face (Null),
-#     # I'd rather not have any of the internal faces be connected with Null
-#     # that might mess up the structure/topology of the connectivity graph
-#     forbidden_edges  = arrangement.get_boundary_halfedges()
-#     for (s,e,k) in forbidden_edges:
-#         arrangement.graph[s][e][k]['obj'].attributes['crossed'] = False
-#         (ts,te,tk) = arrangement.graph[s][e][k]['obj'].twinIdx
-#         arrangement.graph[ts][te][tk]['obj'].attributes['crossed'] = False
-#     return skiz
-
-
-# ################################################################################
-# def set_edge_occupancy(arrangement,
-#                        image, occupancy_thr=200,
-#                        neighborhood=10,
-#                        attribute_key='occupancy'):
-#     '''
-#     This method sets the occupancy every edge in the arrangement wrt image:
-#     arrangement.graph[s][e][k]['obj'].attributes[attribute_key] = [occupied, neighborhood_area]
-
-#     Inputs
-#     ------
-#     arrangement:
-#     The arrangement corresponding to the input image
-
-#     image: bitmap (gray scale)
-#     The image represensts the occupancy map and has high value for open space.
-
-
-#     Parameters
-#     ----------
-#     occupancy_thr: default:200
-#     Any pixel with value below "occupancy_thr" is considered occupied.
-
-#     neighborhood: default=10
-#     half the window size (ie disk radius) that defines the neighnorhood
-
-#     attribute_key: default:'occupancy'
-#     The key to attribute dictionary of the edges to store the 'occupancy'
-#     This method is used for measuring occupancy of edges against occupancy map and skiz_map
-#     Therefor it is important to store the result in the atrribute dictionary with proper key
-
-
-#     Note
-#     ----
-#     "neighborhood_area" is dependant on the "neighborhood" parameter and the length of the edge.
-#     Hence it is the different from edge to edge.
-#     '''
-#     for (s,e,k) in arrangement.graph.edges(keys=True):
-#         neighbors = _pixel_neighborhood_of_halfedge (arrangement, (s,e,k),
-#                                                     neighborhood,
-#                                                     image_size=image.shape)
-
-#         neighbors_val = image[neighbors[:,1], neighbors[:,0]]
-#         occupied = np.nonzero(neighbors_val<occupancy_thr)[0]
-        
-#         # if neighbors.shape[0] is zero, I will face division by zero
-#         # when checking for occupancy ratio
-#         o = occupied.shape[0]
-#         n = np.max([1,neighbors.shape[0]])
-
-#         arrangement.graph[s][e][k]['obj'].attributes[attribute_key] = [o, n]
-
-# ################################################################################
-# def loader (png_name, n_categories=2):
-#     ''' Load files '''
-    
-#     yaml_name = png_name[:-3] + 'yaml'
-#     skiz_name = png_name[:-4] + '_skiz.png'
-#     ply_name = png_name[:-3] + 'ply'
-#     label_name = png_name[:-4]+'_labels_km{:s}.npy'.format(str(n_categories))    
-    
-#     dis_name = png_name[:-4] + '_dis.png'
-#     dis_name = png_name[:-4] + '_dis2.png'
-
-#     ### loading image and converting to binary 
-#     image = np.flipud( cv2.imread( png_name, cv2.IMREAD_GRAYSCALE) )
-#     thr1,thr2 = [200, 255]
-#     ret, image = cv2.threshold(image.astype(np.uint8) , thr1,thr2 , cv2.THRESH_BINARY)
-
-#     ### loading label_image
-#     label_image = np.load(label_name)
-
-#     ### loading distance image
-#     dis_image = np.flipud( cv2.imread(dis_name , cv2.IMREAD_GRAYSCALE) )
-
-#     ### laoding skiz image
-#     skiz = np.flipud( cv2.imread( skiz_name, cv2.IMREAD_GRAYSCALE) )    
-
-#     ### loading traits from yamls
-#     trait_data = arr.utls.load_data_from_yaml( yaml_name )   
-#     traits = trait_data['traits']
-#     boundary = trait_data['boundary']
-#     boundary[0] -= 20
-#     boundary[1] -= 20
-#     boundary[2] += 20
-#     boundary[3] += 20
-
-#     ### trimming traits
-#     traits = arr.utls.unbound_traits(traits)
-#     traits = arr.utls.bound_traits(traits, boundary)
-
-#     return image, label_image, dis_image, skiz, traits

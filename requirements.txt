@@ -7,7 +7,7 @@ matplotlib >= 2.0
 scikit-image >= 0.12
 scikit-learn >= 0.17.1
 
-# Polygon2 >= 2.0.8
+Polygon2 >= 2.0.8
 # Polygon3 >= 3.0.8
 
 # cv2 >= 2.0

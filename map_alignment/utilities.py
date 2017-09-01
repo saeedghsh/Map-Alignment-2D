@@ -117,6 +117,7 @@ def polar_distance(angle1, angle2, radian=False):
 
     return np.min (dist,0)
 
+################################################################################
 def polarDistance(angle1, angle2, radian=True):
     return polar_distance(angle1, angle2, radian)
 
@@ -280,15 +281,16 @@ def smooth(x, window_len=11, window='hanning'):
     scipy.signal.lfilter
  
     TODO: the window parameter could be the window itself if an array instead of a string
-    NOTE: length(output) != length(input), to correct this: return y[(window_len/2-1):-(window_len/2)] instead of just y.
+    NOTE: length(output) != length(input), to correct this:
+    return y[(window_len/2-1):-(window_len/2)] instead of just y.
     """
 
-    if x.ndim != 1: raise ValueError, "smooth only accepts 1 dimension arrays."
-    if x.size < window_len:  raise ValueError, "Input vector needs to be bigger than window size."
     if window_len < 3:  return x
 
-    if not window in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
-        raise ValueError, "Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'"
+    if x.ndim != 1: raise (StandardError('smooth only accepts 1 dimension arrays.'))
+    if x.size < window_len:  raise (StandardError('Input vector needs to be bigger than window size.'))
+    win_type = ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']
+    if window not in win_type: raise( StandardError( 'Window type is unknown'))
 
     s = np.r_[x[window_len-1:0:-1],x,x[-2:-window_len-1:-1]]
     #print(len(s))
@@ -306,5 +308,3 @@ def smooth(x, window_len=11, window='hanning'):
     y = y[dsb:-dse]
 
     return y
-
-

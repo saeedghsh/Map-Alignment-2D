@@ -1,36 +1,37 @@
 Map-Alignment-2D
 ================
-
+This package has been developed for 2D Map Alignment With Region Decomposition.
+Details of the method are presented in the following publication.
+```
+S. G. Shahbandi, M. Magnusson, "2D Map Alignment With Region Decomposition", submitted to Autonomous Robots, 2017.
+```
 
 Dependencies and Download
 -------------------------
-
-- Download, installing dependencies, and install package
+Download, installing dependencies, and install package
 
 ```shell
 # Download
 git clone https://github.com/saeedghsh/Map-Alignment-2D.git
-cd arrangement
+cd Map-Alignment-2D
 
 # Install dependencies
 pip install -r requirements.txt
-pip3 install -r requirements.txt
+<!-- pip3 install -r requirements.txt -->
 
-# Install the package
+# Install the package [optional]
 python setup.py install
-python3 setup.py install
+<!-- python3 setup.py install -->
 ```
 
 Most dependencies are listed in ```requirements.txt```.
 But there are three more, namely [opencv](http://docs.opencv.org/trunk/d7/d9f/tutorial_linux_install.html), [Polygon](https://www.j-raedler.de/projects/polygon/) and [arrangement](https://github.com/saeedghsh/arrangement/), which should be installed separately.
 
 
-
 Usage Example
 -------------
-
 For simplicity and convenience, we assume both maps are provided as bitmap (occupancy grid maps).
-For more examples, see [Halmstad Map Collection](https://github.com/saeedghsh/xxx/).
+For more examples, see [Halmstad Map Collection](https://github.com/saeedghsh/Halmstad-Robot-Maps).
 - Demo
 ```shell
 python demo.py --img_src 'tests/maps/map_src.png' --img_dst 'tests/maps/map_dst.png' -multiprocessing -visualize
@@ -73,16 +74,13 @@ Distributed with a GNU GENERAL PUBLIC LICENSE; see LICENSE.
 ```
 Copyright (C) Saeed Gholami Shahbandi <saeed.gh.sh@gmail.com>
 ```
-This package has been developed to be employed as the underlying spatial representation for robot maps in the following publications:
-- S. G. Shahbandi, M. Magnusson, "2D Map Alignment With Region Decomposition", submitted to Autonomous Robots, 2017.
-
 
 Laundry List
 ------------
-- [ ] try out 3points distance for tforms and provide it precomputed to clustering.
-- [ ] move new methods from ```demo.py``` to ```mapali```.
-- [ ] remove unused methods from ```mapali``` and ```plotting```.
-- [ ] documentation.
+<!-- - [ ] try out 3points distance for tforms and provide it precomputed to clustering. -->
+<!-- - [ ] move new methods from ```demo.py``` to ```mapali```. -->
+- [ ] dump unused methods from ```mapali``` and ```plotting```.
+- [ ] api documentation.
 - [ ] full test suite.
 - [ ] profile for speed-up.
 - [ ] python3 compatible.
