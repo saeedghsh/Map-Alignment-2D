@@ -17,11 +17,9 @@ cd Map-Alignment-2D
 
 # Install dependencies
 pip install -r requirements.txt
-<!-- pip3 install -r requirements.txt -->
 
 # Install the package [optional]
 python setup.py install
-<!-- python3 setup.py install -->
 ```
 
 Most dependencies are listed in ```requirements.txt```.
