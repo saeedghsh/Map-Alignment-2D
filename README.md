@@ -1,10 +1,9 @@
 Map-Alignment-2D
 ================
+
 This package has been developed for 2D Map Alignment With Region Decomposition.
 Details of the method are presented in the following publication.
-```
-S. G. Shahbandi, M. Magnusson, "2D Map Alignment With Region Decomposition", submitted to Autonomous Robots, 2017.
-```
+- Saeed Gholami Shahbandi, Martin Magnusson, *2D Map Alignment With Region Decomposition*, CoRR, abs/1709.00309, 2017. [URL](https://arxiv.org/abs/1709.00309)
 
 Dependencies and Download
 -------------------------
