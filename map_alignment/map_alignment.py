@@ -763,11 +763,12 @@ def _arrangement_match_score(arrangement_src, arrangement_dst, tform):
     '''
     tform:  a transformation instance of skimage lib
     '''
-    # construct a matplotlib transformation instance (for transformation of paths )
-    aff2d = matplotlib.transforms.Affine2D( tform.params )
 
     arrange_src = arrangement_src
     arrange_dst = arrangement_dst
+
+    # construct a matplotlib transformation instance (for transformation of paths )
+    aff2d = matplotlib.transforms.Affine2D( tform.params )
 
     ### transforming paths of faces, and updating centre points 
     faces_src = arrange_src.decomposition.faces
@@ -860,7 +861,6 @@ def _arrangement_match_score(arrangement_src, arrangement_dst, tform):
     # ratio = max([src_arr_area,dst_arr_area]) / min([src_arr_area,dst_arr_area])
     # arr_score *= ratio
     # ################################# Experimental: to be removed    
-
 
     return arr_score
 

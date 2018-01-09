@@ -64,14 +64,6 @@ python demo.py --img_src 'tests/maps/map_src.png' --img_dst 'tests/maps/map_dst.
 <!-- 'dbscan_eps': 0.051, -->
 <!-- 'dbscan_min_samples': 2} -->
 
-
-License
--------
-Distributed with a GNU GENERAL PUBLIC LICENSE; see LICENSE.
-```
-Copyright (C) Saeed Gholami Shahbandi <saeed.gh.sh@gmail.com>
-```
-
 Laundry List
 ------------
 <!-- - [ ] try out 3points distance for tforms and provide it precomputed to clustering. -->
@@ -82,5 +74,9 @@ Laundry List
 - [ ] profile for speed-up.
 - [ ] python3 compatible.
 
-
-
+License
+-------
+Distributed with a GNU GENERAL PUBLIC LICENSE; see [LICENSE](https://github.com/saeedghsh/Map-Alignment-2D/blob/master/LICENSE).
+```
+Copyright (C) Saeed Gholami Shahbandi
+```
