@@ -1,6 +1,6 @@
 '''
 Copyright (C) Saeed Gholami Shahbandi. All rights reserved.
-Author: Saeed Gholami Shahbandi (saeed.gh.sh@gmail.com)
+Author: Saeed Gholami Shahbandi
 
 This file is part of Arrangement Library.
 The of Arrangement Library is free software: you can redistribute it and/or
@@ -24,7 +24,7 @@ from __future__ import print_function
 #     pass
 
 # new_paths = [
-#     u'../arrangement/', # this would be relative address from the runMe.y script that loads this module 
+#     u'../arrangement/', # this would be relative address from the runMe.y script that loads this module
 # ]
 # for path in new_paths:
 #     if not( path in sys.path):
@@ -32,7 +32,7 @@ from __future__ import print_function
 
 import time
 import copy
-import itertools 
+import itertools
 # import collections
 
 import cv2
@@ -64,7 +64,7 @@ import contextlib as ctx
 from functools import partial
 
 ################################################################################
-###################################################################### 
+######################################################################
 ################################################################################
 
 def _lock_n_load(file_name, config={}):
@@ -78,7 +78,7 @@ def _lock_n_load(file_name, config={}):
     of open space.
     2) trait detection; unexplored areas are treated as occupied area, because
     we are only interested in occupied cells for line detection.
-    
+
     results: 'image', 'traits', 'skiz', 'distance'
     '''
     ### default values
@@ -89,7 +89,7 @@ def _lock_n_load(file_name, config={}):
     if 'peak_detect_sinogram_config' not in config: config['peak_detect_sinogram_config'] = [10, 15, 0.15]
     if 'orthogonal_orientations' not in config: config['orthogonal_orientations'] = True
     results = {}
-    
+
     ######################################## laoding image
     img = np.flipud( cv2.imread( file_name, cv2.IMREAD_GRAYSCALE) )
     results['image'] = img
@@ -102,11 +102,11 @@ def _lock_n_load(file_name, config={}):
     # bin_ = np.array( np.where( img < thr, 0, 255 ), dtype=np.uint8)
     _, bin_ = cv2.threshold(img, thr, 255 , cv2.THRESH_BINARY)
     img_skiz, img_disance = _skiz_bitmap(bin_, invert=True, return_distance=True)
-    
+
     # scaling distance image to [0, 255]
     img_disance += img_disance.min()
     img_disance *= 255. / img_disance.max()
-    
+
     results['skiz'] = img_skiz
     results['distance'] = img_disance
 
@@ -116,7 +116,7 @@ def _lock_n_load(file_name, config={}):
 
         file_ext = trait_file_name.split('.')[-1]
         if file_ext in ['yaml', 'YAML', 'yml', 'YML']:
-            trait_data = arr.utls.load_data_from_yaml( trait_file_name )   
+            trait_data = arr.utls.load_data_from_yaml( trait_file_name )
             traits = trait_data['traits']
         else:
             raise(StandardError('loading traits from file only supports yaml (svg to come soon)'))
@@ -145,14 +145,14 @@ def _lock_n_load(file_name, config={}):
             [thr1, thr2] = config['binary_thresholding_2']
             ret, bin_img = cv2.threshold(img , thr1,thr2 , cv2.THRESH_BINARY_INV)
             image = bin_img
-            
+
         elif config['trait_detection_source'] == 'edge':
             [thr1, thr2] = config['binary_thresholding_2']
             print ('apt_size is set hard coded')
             apt_size = 3
             edge_img = cv2.Canny(img, thr1, thr2, apt_size)
             image = edge_img
-    
+
         traits = _find_lines_with_radiography(image, orientations, config['peak_detect_sinogram_config'])
 
 
@@ -161,7 +161,7 @@ def _lock_n_load(file_name, config={}):
     traits = arr.utls.unbound_traits(traits)
     traits = arr.utls.bound_traits(traits, boundary)
     results['traits'] = traits
-    
+
     elapsed_time = time.time() - tic
 
     return results, elapsed_time
@@ -183,8 +183,8 @@ def _skiz_bitmap (image, invert=True, return_distance=False):
     Parameter
     ---------
     invert: Boolean (default:False)
-    If False, the ridges will be high (white) and backgroud will be low (black) 
-    If True, the ridges will be low (black) and backgroud will be high (white) 
+    If False, the ridges will be high (white) and backgroud will be low (black)
+    If True, the ridges will be low (black) and backgroud will be high (white)
 
     Output
     ------
@@ -207,7 +207,7 @@ def _skiz_bitmap (image, invert=True, return_distance=False):
     image = cv2.erode(image, kernel, iterations = 1)
     # image = cv2.medianBlur(image, 5)
     # image = cv2.GaussianBlur(image, (5,5), 0).astype(np.uint8)
-    # image = cv2.erode(image, kernel, iterations = 1) 
+    # image = cv2.erode(image, kernel, iterations = 1)
     image = cv2.medianBlur(image, 5)
 
     ###### compute distance image
@@ -223,19 +223,19 @@ def _skiz_bitmap (image, invert=True, return_distance=False):
     grd_abs = np.abs(grd)
 
     # at some points on the skiz tree, the abs(grd) is very weak
-    # this erosion fortifies those points 
+    # this erosion fortifies those points
     kernel = np.ones((3,3),np.uint8)
     grd_abs = cv2.erode(grd_abs, kernel, iterations = 1)
 
     # only places where gradient is low
     grd_binary_inv = np.where( grd_abs < 0.8*grd_abs.max(), 1, 0 )
-    
+
     ###### skiz image
     # sometimes the grd_binary_inv becomes high value near the boundaries
     # the erosion of the image means to extend the low-level boundaries
     # and mask those undesired points
     kernel = np.ones((5,5),np.uint8)
-    image = cv2.erode(image, kernel, iterations = 1)    
+    image = cv2.erode(image, kernel, iterations = 1)
     skiz = (grd_binary_inv *image ).astype(np.uint8)
 
     # ###### map to [0,255]
@@ -256,11 +256,11 @@ def _skiz_bitmap (image, invert=True, return_distance=False):
     # kernel = np.ones((3,3),np.uint8)
     # skiz = cv2.dilate(skiz, kernel, iterations = 1)
 
-    ###### inverting 
+    ###### inverting
     if invert:
         thr1,thr2 = [127, 255]
         ret, skiz = cv2.threshold(skiz , thr1,thr2 , cv2.THRESH_BINARY_INV)
-        
+
 
     if return_distance:
         return skiz, dis
@@ -275,7 +275,7 @@ def _find_dominant_orientations(image,
     intense smoothing of the image and weithed histogram of gradient is very
     cruicial, min value for filter size for image processing should be 9
     and for 1D signal smoothing atleast 11
-    
+
     '''
     # flipud: why? I'm sure it won't work otherwise, but dont know why
     # It should happen in both "_find_dominant_orientations" & "find_grid_lines"
@@ -283,17 +283,17 @@ def _find_dominant_orientations(image,
 
     ### smoothing
     img = cv2.blur(img, (11,11))
-    img = cv2.GaussianBlur(img, (11,11),0)    
-    
+    img = cv2.GaussianBlur(img, (11,11),0)
+
     ### oriented gradient of the image
     # is it (dx - 1j*dy) or (dx + 1j*dy)
     # this is related to "flipud" problem mentioned above
     dx = cv2.Sobel(img, cv2.CV_64F, 1,0, ksize=11)
     dy = cv2.Sobel(img, cv2.CV_64F, 0,1, ksize=11)
     grd = dx - 1j*dy
-    # return grd 
+    # return grd
 
-    
+
     ### weighted histogram of oriented gradients (over the whole image)
     hist, binc = utils.wHOG (grd, NumBin=180*5, Extension=False)
     hist = utils.smooth(hist, window_len=21)
@@ -313,14 +313,14 @@ def _find_dominant_orientations(image,
         MinPeakDist = 30 if ('MinPeakDist' not in find_peak_conf) else find_peak_conf['MinPeakDist']
         MinPeakVal = .2 if ('MinPeakVal' not in find_peak_conf) else find_peak_conf['MinPeakVal']
         Polar = False if ('Polar' not in find_peak_conf) else find_peak_conf['Polar']
-        
+
         peak_idx = utils.FindPeaks( hist,
                                     CWT=True, cwt_range=(5,50,5),
                                     Refine_win=20 , MinPeakDist = 30 , MinPeakVal=.2,
                                     Polar=False )
-        
+
         orientations = list(binc[peak_idx])
-    
+
     # shrinking the range to [-pi/2, pi/2]
     for idx in range(len(orientations)):
         if orientations[idx]< -np.pi/2:
@@ -347,18 +347,18 @@ def _find_lines_with_radiography(image, orientations, peak_detect_config):
 
     ### fetching setting for sinogram peak detection
     [refWin, minDist, minVal] = peak_detect_config
-    
+
     ### radiography
     # flipud: why? I'm sure it won't work otherwise, but dont know why
     # It should happen in both "_find_dominant_orientations" & "find_grid_lines"
     image = np.flipud(image)
     imgcenter = (image.shape[1]/2, # cols == x
                  image.shape[0]/2) # rows == y
-    
+
     sinog_angles = orientations - np.pi/2 # in radian
     sinograms = skimage.transform.radon(image, theta=sinog_angles*180/np.pi )#, circle=True)
     sinogram_center = len(sinograms.T[0])/2
-    
+
     lines = []
     for (orientation, sinog_angle, sinogram) in zip(orientations, sinog_angles, sinograms.T):
         # Find peaks in sinogram:
@@ -368,18 +368,18 @@ def _find_lines_with_radiography(image, orientations, peak_detect_config):
                                   MinPeakDist = int(minDist),
                                   MinPeakVal = minVal,
                                   Polar=False)
-            
+
         # line's distance to the center of the image
         dist = np.array(peakind) - sinogram_center
-        
+
         pts_0 = [ ( imgcenter[0] + d*np.cos(sinog_angle),
                     imgcenter[1] + d*np.sin(sinog_angle) )
                   for d in dist]
-        
+
         pts_1 = [ ( point[0] + np.cos(orientation) ,
                     point[1] + np.sin(orientation) )
                   for point in pts_0]
-        
+
         lines += [arr.trts.LineModified( args=( sym.Point(p0[0],p0[1]), sym.Point(p1[0],p1[1]) ) )
                   for (p0,p1) in zip(pts_0,pts_1)]
 
@@ -388,7 +388,7 @@ def _find_lines_with_radiography(image, orientations, peak_detect_config):
 
 
 ################################################################################
-###################################################################### 
+######################################################################
 ################################################################################
 def _construct_arrangement(data, config={}):
     '''
@@ -430,19 +430,19 @@ def _construct_arrangement(data, config={}):
     arrange = _set_face_occupancy_attribute(arrange, data['image'], config['occupancy_threshold'])
     # print ('counting occupancy of faces:{:.5f}'.format(time.time()-tic_))
 
-    ######################################## 
-    # if print_messages: print ('\t setting ombb attribute of faces ...') 
+    ########################################
+    # if print_messages: print ('\t setting ombb attribute of faces ...')
     # tic_ = time.time()
     arrange = _set_ombb_of_faces (arrange)
-    # print ('setting ombb attribute of faces:{:.5f}'.format(time.time()-tic_))    
-    ######################################## 
-    # if print_messages: print ('\t caching face area weight ...') 
-    # tic_ = time.time()    
+    # print ('setting ombb attribute of faces:{:.5f}'.format(time.time()-tic_))
+    ########################################
+    # if print_messages: print ('\t caching face area weight ...')
+    # tic_ = time.time()
     superface = arrange._get_independent_superfaces()[0]
     arrange_area = superface.get_area()
     for face in arrange.decomposition.faces:
         face.attributes['area_weight'] = float(face.get_area()) / float(arrange_area)
-    # print ('face area weight:{:.5f}'.format(time.time()-tic_))    
+    # print ('face area weight:{:.5f}'.format(time.time()-tic_))
 
     elapsed_time = time.time() - tic
     return arrange, elapsed_time
@@ -475,7 +475,7 @@ def _prune_arrangement_with_distance(arrangement, distance_image,
 
     edges_to_purge = []
     for (s,e,k) in arrangement.graph.edges(keys=True):
-        
+
         # rule 1: (self and twin) not in forbidden_edges
         not_forbidden = (s,e,k) not in forbidden_edges
         # for a pair of twin half-edge, it's possible for one to be in forbidden list and the other not
@@ -483,7 +483,7 @@ def _prune_arrangement_with_distance(arrangement, distance_image,
         # this is problematic for arrangement._decompose, I can't let this happen! No sir!
         (ts,te,tk) = arrangement.graph[s][e][k]['obj'].twinIdx
         not_forbidden = not_forbidden and  ((ts,te,tk) not in forbidden_edges)
-        
+
         # rule 2: low_edge_occupancy - below "low_occ_percent"
         neighbors_dis_val = arrangement.graph[s][e][k]['obj'].attributes['distances']
         sum_ = neighbors_dis_val.sum() / 255.
@@ -491,7 +491,7 @@ def _prune_arrangement_with_distance(arrangement, distance_image,
         ok_to_prun_sum = float(sum_)/siz_ > distance_threshold
         # var_ = np.var(neighbors_dis_val)
         # ok_to_prun_var = var_ < 200
-        
+
         if not_forbidden and ok_to_prun_sum:
             edges_to_purge.append( (s,e,k) )
 
@@ -515,7 +515,7 @@ def _generate_hypothese(src_arr, src_img_shape,
     - tform_type='affine'
 
     parameters for "_reject_implausible_transformations()":
-    - scale_mismatch_ratio_threshold (default: 0.5)    
+    - scale_mismatch_ratio_threshold (default: 0.5)
     - scale_bounds (default: [.3, 3])
 
     '''
@@ -524,7 +524,7 @@ def _generate_hypothese(src_arr, src_img_shape,
     if 'scale_bounds' not in config: config['scale_bounds'] = [.3, 3] #[.1, 10]
 
     if 'face_occupancy_threshold' not in config: config['face_occupancy_threshold'] = .5
-    # if '' not in config: config[''] = 
+    # if '' not in config: config[''] =
 
     tic = time.time()
 
@@ -542,7 +542,7 @@ def _generate_hypothese(src_arr, src_img_shape,
     tforms = np.array(tforms)
     # if print_messages: print ( '\t totaly {:d} transformations estimated'.format(tforms.shape[0]) )
     tforms_total = tforms.shape[0]
-    
+
     tforms = _reject_implausible_transformations( tforms,
                                                   src_img_shape, dst_img_shape,
                                                   config['scale_mismatch_ratio_threshold'],
@@ -561,10 +561,10 @@ def _select_winning_hypothesis(src_arr, dst_arr, tforms, config={}):
     '''
     input:
     arrangements, tforms
-    
+
     too_many_tforms = 1000
     sklearn.cluster.DBSCAN(eps=0.051, min_samples=2)
-    
+
     output:
     hypothesis
     '''
@@ -573,7 +573,7 @@ def _select_winning_hypothesis(src_arr, dst_arr, tforms, config={}):
     if 'too_many_tforms' not in config: config['too_many_tforms'] = 1000
     if 'dbscan_eps' not in config: config['dbscan_eps'] = 0.051
     if 'dbscan_min_samples' not in config: config['dbscan_min_samples'] = 2
-    # if '' not in config: config[''] = 
+    # if '' not in config: config[''] =
 
     tic = time.time()
 
@@ -585,7 +585,7 @@ def _select_winning_hypothesis(src_arr, dst_arr, tforms, config={}):
                                                     arrangement_src=src_arr,
                                                     arrangement_dst=dst_arr,
                                                     tforms = tforms)
-                        
+
             with ctx.closing(mp.Pool(processes=4)) as p:
                 arr_match_score = p.map( _arrangement_match_score_par, range(len(tforms)))
 
@@ -611,12 +611,12 @@ def _select_winning_hypothesis(src_arr, dst_arr, tforms, config={}):
         parameters = np.stack([ np.array( [tf.translation[0], tf.translation[1], tf.rotation, tf.scale[0] ] )
                                 for tf in tforms ], axis=0)
         assert not np.any( np.isnan(parameters))
-        
+
         # note that the scaling is only applied to parametes (for clustering),
         # the transformations themselves are intact
         parameters -= np.mean( parameters, axis=0 )
         parameters /= np.std( parameters, axis=0 )
-        
+
         #################### clustering pool into hypotheses
         # if print_messages: print ('\t clustering {:d} transformations'.format(parameters.shape[0]))
         cls = sklearn.cluster.DBSCAN(eps=config['dbscan_eps'], min_samples=config['dbscan_min_samples'])
@@ -626,13 +626,13 @@ def _select_winning_hypothesis(src_arr, dst_arr, tforms, config={}):
         # if print_messages: print ( '\t *** total: {:d} clusters...'.format(unique_labels.shape[0]-1) )
 
         ###  match_score for each cluster
-        
+
         if config['multiprocessing']:
             cluster_representative = {}
             for lbl in np.setdiff1d(unique_labels,[-1]):
                 class_member_idx = np.nonzero(labels == lbl)[0]
                 class_member = [ tforms[idx] for idx in class_member_idx ]
-                
+
                 # pick the one that is closest to all others in the same group
                 params = parameters[class_member_idx]
                 dist_mat = scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(params, 'euclidean'))
@@ -659,13 +659,13 @@ def _select_winning_hypothesis(src_arr, dst_arr, tforms, config={}):
             for lbl in np.setdiff1d(unique_labels,[-1]):
                 class_member_idx = np.nonzero(labels == lbl)[0]
                 class_member = [ tforms[idx] for idx in class_member_idx ]
-                
+
                 # pick the one that is closest to all others in the same group
                 params = parameters[class_member_idx]
                 dist_mat = scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(params, 'euclidean'))
                 dist_arr = dist_mat.sum(axis=0)
                 tf = class_member[ np.argmin(dist_arr) ]
-                
+
                 arrange_src = src_arr
                 arrange_dst = dst_arr
                 arr_match_score[lbl] = _arrangement_match_score(arrange_src, arrange_dst, tf)
@@ -687,7 +687,7 @@ def _select_winning_hypothesis(src_arr, dst_arr, tforms, config={}):
         ### pick the wining cluster
         hypothesis_idx = max(arr_match_score, key=arr_match_score.get)
         hypothesis =  winning_cluster[hypothesis_idx]
-        
+
         n_cluster = unique_labels.shape[0]-1
 
     # np.save('arr_match_score_'+'_'.join(keys)+'.npy', arr_match_score)
@@ -713,7 +713,7 @@ def _reject_implausible_transformations(transformations,
     (affine transforms, ie. tf.scale is a tuple)
 
     image_src_shape, image_dst_shape
-    (assuming images are vertically aligned with x-y axes)    
+    (assuming images are vertically aligned with x-y axes)
 
     Parameters
     ----------
@@ -741,11 +741,11 @@ def _reject_implausible_transformations(transformations,
     ### reject transformations, if images won't overlap under the transformation
     src_h, src_w = image_src_shape
     src = np.array([ [0,0], [src_w,0], [src_w,src_h], [0,src_h], [0,0] ])
-    
+
     dst_h, dst_w = image_dst_shape
     dst = np.array([ [0,0], [dst_w,0], [dst_w,dst_h], [0,dst_h], [0,0] ])
     dst_path = _create_mpath(dst)
-    
+
     overlapping_idx = []
     for idx,tf in enumerate(transformations):
         src_warp = tf._apply_mat(src, tf.params)
@@ -754,8 +754,8 @@ def _reject_implausible_transformations(transformations,
             overlapping_idx.append(idx)
     # print ('non_overlapping_reject: {:d}'.format(len(transformations)-len(overlapping_idx) ) )
 
-    transformations = transformations[overlapping_idx]    
-    
+    transformations = transformations[overlapping_idx]
+
     return transformations
 
 ################################################################################
@@ -770,10 +770,10 @@ def _arrangement_match_score(arrangement_src, arrangement_dst, tform):
     # construct a matplotlib transformation instance (for transformation of paths )
     aff2d = matplotlib.transforms.Affine2D( tform.params )
 
-    ### transforming paths of faces, and updating centre points 
+    ### transforming paths of faces, and updating centre points
     faces_src = arrange_src.decomposition.faces
     faces_dst = arrange_dst.decomposition.faces
-    
+
 
     ### find face to face association
     faces_src_path = [face.path.transformed(aff2d) for face in faces_src]
@@ -794,7 +794,7 @@ def _arrangement_match_score(arrangement_src, arrangement_dst, tform):
 
     face_cen_src = np.array([poly.center() for poly in faces_src_poly])
     face_cen_dst = np.array([poly.center() for poly in faces_dst_poly])
-        
+
     f2f_association = {}
     for src_idx in range(f2f_distance.shape[0]):
         # if the centre of faces in dst are not inside the current face of src
@@ -826,7 +826,7 @@ def _arrangement_match_score(arrangement_src, arrangement_dst, tform):
         union = poly_src | poly_dst
         intersection = poly_src & poly_dst
 
-        # if one of the faces has the area equal to zero 
+        # if one of the faces has the area equal to zero
         if union.area() == 0:
             score =  0.
         else:
@@ -842,10 +842,10 @@ def _arrangement_match_score(arrangement_src, arrangement_dst, tform):
     for (f1_idx,f2_idx) in f2f_match_score.keys():
         # f1_area = faces_src[f1_idx].get_area()
         # f2_area = faces_dst[f2_idx].get_area()
-    
+
         # f1_w = float(f1_area) / float(arrange_src_area)
         # f2_w = float(f2_area) / float(arrange_dst_area)
-        
+
         # face_pair_weight[(f1_idx,f2_idx)] = np.min([f1_w, f2_w])
         face_pair_weight[(f1_idx,f2_idx)] = np.min([faces_src[f1_idx].attributes['area_weight'],
                                                     faces_dst[f2_idx].attributes['area_weight']])
@@ -860,7 +860,7 @@ def _arrangement_match_score(arrangement_src, arrangement_dst, tform):
     # dst_arr_area = arrangement_dst._get_independent_superfaces()[0].get_area()
     # ratio = max([src_arr_area,dst_arr_area]) / min([src_arr_area,dst_arr_area])
     # arr_score *= ratio
-    # ################################# Experimental: to be removed    
+    # ################################# Experimental: to be removed
 
     return arr_score
 
@@ -887,7 +887,7 @@ def _align_ombb(face_src,face_dst, tform_type='similarity'):
 
     alignments = [ skimage.transform.estimate_transform( tform_type, np.roll(src,-roll,axis=0), dst )
                    for roll in range(4) ]
-    return alignments 
+    return alignments
 
 
 ################################################################################
@@ -895,7 +895,7 @@ def _distance2point(p1,p2,p):
     '''
     move to arr.utls
     called by "_oriented_minimum_bounding_box"
-    
+
     (p1,p2) represents a line, not a segments
     input points are numpy arrays or lists
     '''
@@ -908,10 +908,10 @@ def _linesIntersectionPoint(P1,P2, P3,P4):
     '''
     move to arr.utls
     called by "_oriented_minimum_bounding_box"
-    
+
     line1 = P1,P2
     line2 = P3,P4
-    
+
     returns the intersection "Point" of the two lines
     returns "None" if lines are parallel
     This function treats the line as infinit lines
@@ -924,7 +924,7 @@ def _linesIntersectionPoint(P1,P2, P3,P4):
     else:
         return None
 
-################################################################################        
+################################################################################
 def _convexHullArea(vertices):
     '''
     move to arr.utls
@@ -938,12 +938,12 @@ def _convexHullArea(vertices):
     angletoVertex = [np.arctan2(p[1]-center[1] , p[0]-center[0])
                      for p in vertices]
     v = np.array([v for (t,v) in sorted(zip(angletoVertex,vertices))])
-    
+
     ### calculatig the area, as a sum of triangles
     area = [np.cross([v[i,0]-v[0,0],v[i,1]-v[0,1]] , [v[i+1,0]-v[0,0],v[i+1,1]-v[0,1]])
             for i in range(1,len(v)-1)]
     area = 0.5 * np.sum(np.abs(area))
-    
+
     return area
 
 ################################################################################
@@ -977,25 +977,25 @@ def _oriented_minimum_bounding_box (points):
 
         l12t = np.arctan2(p2[1]-p1[1] , p2[0]-p1[0])
         l34t = l12t+np.pi/2
-        
+
         # line1 = p1,p2
         l1p1, l1p2 = p1, p2
 
-        # line2 = construct the parallel from vIdx 
+        # line2 = construct the parallel from vIdx
         dis = list(np.abs([_distance2point(l1p1, l1p2, points[p]) for p in verticesIdx]))
         val, idx = max((val, idx) for (idx, val) in enumerate(dis))
         vIdx = verticesIdx[idx]
         l2p1, l2p2 = points[vIdx], points[vIdx]+np.array([np.cos(l12t),np.sin(l12t)])
-        
+
         # lineTemp = arbitrary perpendicular line to line1 and line2.
         ltp1,ltp2 = p1, p1+np.array([np.cos(l34t),np.sin(l34t)])
-        
+
         # line3 = parallel to lineTemp, passing through farthest vertex to lineTemp
         dis = list(np.abs([_distance2point(ltp1,ltp2, points[p])  for p in verticesIdx]))
         val, idx = max((val, idx) for (idx, val) in enumerate(dis))
         vIdx = verticesIdx[idx]
         l3p1, l3p2 = points[vIdx], points[vIdx]+np.array([np.cos(l34t),np.sin(l34t)])
-        
+
         # line4 = parallel to line3, passing through farthest vertex to line3
         dis = list(np.abs([_distance2point(l3p1,l3p2, points[p])  for p in verticesIdx]))
         val, idx = max((val, idx) for (idx, val) in enumerate(dis))
@@ -1016,13 +1016,13 @@ def _oriented_minimum_bounding_box (points):
         ### sorting bb according to tt
         BB = np.array([ v for (t,v) in sorted(zip(angle2Vertex,vertices)) ])
         boundingBoxes.append(BB)
-        
+
         # find the area covered by the BoundingBox
         area.append(_convexHullArea(BB))
-                
+
     # return the BoundingBox with smallest area
     val, idx = min((val, idx) for (idx, val) in enumerate(area))
-       
+
     return boundingBoxes[idx]
 
 
@@ -1038,7 +1038,7 @@ def _create_mpath ( points ):
     note: points must be in order
     - copied from mesh to OGM
     '''
-    
+
     # start path
     verts = [ (points[0,0], points[0,1]) ]
     codes = [ mpath.Path.MOVETO ]
@@ -1077,7 +1077,7 @@ def _get_pixels_in_mpath(path, image_shape=None):
 
     x, y = np.meshgrid( range(xmin,xmax+1), range(ymin,ymax+1) )
     mbb_pixels = np.stack( (x.flatten().T,y.flatten().T), axis=1)
-    
+
     in_path = path.contains_points(mbb_pixels)
 
     return mbb_pixels[in_path, :]
@@ -1105,7 +1105,7 @@ def _pixel_neighborhood_of_segment (p1,p2, neighborhood=5):
     Output:
     -------
     neighbors: (nx2) np.array
-    
+
 
     Note:
     Internal naming convention for the coordinates order is:
@@ -1136,10 +1136,10 @@ def _pixel_neighborhood_of_segment (p1,p2, neighborhood=5):
     dists = dists.min(axis=0)
 
     # flagging all the points that are in the neighborhood
-    # of the 
+    # of the
     neighbors_idx = np.nonzero( dists<neighborhood )[0]
     neighbors = mbb_pixels[neighbors_idx]
-    
+
     return neighbors
 
 ################################################################################
@@ -1147,11 +1147,11 @@ def _pixel_neighborhood_of_halfedge (arrangement, (s,e,k),
                                     neighborhood=5, image_size=None):
     '''
     move to arr.arr
-    
+
     Inputs:
     -------
     arrangement:
-    (s,e,k): an index-set to a half-edge    
+    (s,e,k): an index-set to a half-edge
 
     Parameters:
     -----------
@@ -1177,11 +1177,11 @@ def _pixel_neighborhood_of_halfedge (arrangement, (s,e,k),
 
     if not( isinstance(trait.obj, (sym.Line, sym.Segment, sym.Ray) ) ):
         raise (StandardError(' only line trait are supported for now '))
-    
+
     # Assuming only line segmnent - no arc-circle
     p1 = np.array([pt_1.x,pt_1.y]).astype(float)
     p2 = np.array([pt_2.x,pt_2.y]).astype(float)
-    
+
     neighbors = _pixel_neighborhood_of_segment (p1,p2, neighborhood)
 
     if image_size is None:
@@ -1214,7 +1214,7 @@ def _set_face_occupancy_attribute(arrangement, image, occupancy_threshold=200):
 def _set_face_centre_attribute(arrangement, source=['nodes','path'][0]):
     '''
     assumes all the faces in arrangement are convex
-    
+
     if source == 'nodes' -> centre from nodes of arrangement
     if source == 'path' -> centre from vertrices of the face
     (for source == 'path', path must be up-todate)
@@ -1242,7 +1242,7 @@ def _construct_connectivity_map(arrangement, set_coordinates=True):
 
     Note
     ----
-    The keys to nodes in connectivity_map corresponds to 
+    The keys to nodes in connectivity_map corresponds to
     face indices in the arrangement
     '''
 
@@ -1270,21 +1270,21 @@ def _construct_connectivity_map(arrangement, set_coordinates=True):
     # a square with a non-tangent circle enclosed and a vetical line in middle
     # the square.substract(circle) region is split to two and they are connected
     # through two topologically distict paths. hence, the graph of connectivity
-    # map must be multi. But if two faces are connected with different pairs of 
+    # map must be multi. But if two faces are connected with different pairs of
     # half-edge that are adjacent, these connection pathes are not topologically
     # distict, hence they should be treated as one connection
 
-    # todo: if the todo above is done, include it in dual_graph of the 
+    # todo: if the todo above is done, include it in dual_graph of the
     # arrangement
 
     # for every pair of faces an edge is added if
-    # faces are neighbours and the shared-half_edges are crossed 
+    # faces are neighbours and the shared-half_edges are crossed
     for (f1Idx,f2Idx) in itertools.combinations( range(len(faces)), 2):
         mutualHalfEdges = arrangement.decomposition.find_mutual_halfEdges(f1Idx, f2Idx)
         mutualHalfEdges = list( set(mutualHalfEdges).intersection(set(corssed_halfedges)) )
         if len(mutualHalfEdges) > 0:
             connectivity_map.add_edges_from( [ (f1Idx,f2Idx, {}) ] )
-            
+
     return arrangement, connectivity_map
 
 
@@ -1296,7 +1296,7 @@ def _set_edge_crossing_attribute(arrangement, skiz,
     ----------
     neighborhood = 5 # the bigger, I think the more robust it is wrt skiz-noise
     cross_thr = 4 # seems a good guess! smaller also works
-    
+
     Note
     ----
     skiz lines are usually about 3 pixel wide, so a proper edge crossing would
@@ -1312,7 +1312,7 @@ def _set_edge_crossing_attribute(arrangement, skiz,
     Note
     ----
     since "_set_edge_occupancy" counts low_values as occupied,
-    (invert=True) must be set when calling the _skiz_bitmap 
+    (invert=True) must be set when calling the _skiz_bitmap
     '''
 
     _set_edge_occupancy(arrangement,
@@ -1380,7 +1380,7 @@ def _set_edge_occupancy(arrangement,
 
         neighbors_val = image[neighbors[:,1], neighbors[:,0]]
         occupied = np.nonzero(neighbors_val<occupancy_thr)[0]
-        
+
         # if neighbors.shape[0] is zero, I will face division by zero
         # when checking for occupancy ratio
         o = occupied.shape[0]
@@ -1428,7 +1428,7 @@ def _set_edge_occupancy(arrangement,
 
 #     connectivity_maps (dictionary)
 #     the keys are the map names and the values are connectivity map (graph) instances of the maps
-    
+
 
 #     Output
 #     ------
@@ -1457,11 +1457,11 @@ def _set_edge_occupancy(arrangement,
 #     keys = arrangements.keys()
 #     f = arrangements[keys[0]].decomposition.faces[0]
 #     labels = [ int(k) for k in f.attributes['label_count'].keys() ]
-    
+
 #     # assuming label -1 is universal, we'll set it at the end
 #     labels.pop(labels.index(-1))
 
-#     ### constructing the "features" dictionary    
+#     ### constructing the "features" dictionary
 #     features = {}
 #     for key in keys:
 #         for lbl in labels:
@@ -1473,13 +1473,13 @@ def _set_edge_occupancy(arrangement,
 
 #     ### feature scaling (standardization)
 #     for key in keys:
-#         # std and mean of all features in current map (regardless of their place category labels) 
+#         # std and mean of all features in current map (regardless of their place category labels)
 #         # TD: should I standardize wrt (mean,std) of all maps?
 #         all_features = np.concatenate( [ features['{:s}_{:d}'.format(key,lbl)]
 #                                          for lbl in labels ] )
 #         std = np.std( all_features, axis=0 )
 #         mean = np.mean( all_features, axis=0 )
-        
+
 #         # standardizing all features
 #         for lbl in labels:
 #             features['{:s}_{:d}'.format(key,lbl)] -= mean
@@ -1506,7 +1506,7 @@ def _set_edge_occupancy(arrangement,
 
 #     ####################
 #     #################### mode2 - gauranteed one to one association
-#     #################### 
+#     ####################
 #     # row indices (lbl1) are labels of the source map
 #     # col indices (lbl2) are labels of the destination map
 #     dist = np.array([ [ bhattacharyya_distance(
@@ -1517,7 +1517,7 @@ def _set_edge_occupancy(arrangement,
 #     )[0,0]
 #                         for lbl1 in labels]
 #                       for lbl2 in labels ])
-    
+
 #     row_ind, col_ind = scipy.optimize.linear_sum_assignment(dist)
 #     associations = {lbl1:lbl2 for lbl1,lbl2 in zip(row_ind,col_ind)}
 #     # assuming label -1 is universal, we'll set it as default
@@ -1570,14 +1570,14 @@ def _set_edge_occupancy(arrangement,
 #     # L = nx.laplacian_matrix(connectivity_maps[key])
 #     L = nx.normalized_laplacian_matrix(graph)
 #     eigenvalues = numpy.linalg.eigvals(L.A)
-    
+
 #     eigenvector_centrality = nx.eigenvector_centrality_numpy( graph )
 #     load_centrality = nx.load_centrality( graph)
 #     harmonic_centrality = nx.harmonic_centrality( graph )
 #     degree_centrality = nx.degree_centrality( graph )
 #     closeness_centrality = nx.closeness_centrality( graph )
 #     betweenness_centrality = nx.betweenness_centrality( graph )
-    
+
 
 #     for idx, key in enumerate( graph.node.keys() ):
 #         graph.node[key]['features'] = [
@@ -1601,8 +1601,8 @@ def _set_edge_occupancy(arrangement,
 #         x, y = np.meshgrid( np.arange(label_image.shape[1]),
 #                             np.arange(label_image.shape[0]))
 #         all_pixels = np.stack( (x.flatten(), y.flatten() ), axis=1)
-        
-        
+
+
 #     in_face = face.path.contains_points(all_pixels)
 #     pixels = all_pixels[in_face, :]
 
@@ -1639,7 +1639,7 @@ def _set_edge_occupancy(arrangement,
 
 #     attributes['label_count'] (dictionary)
 #     per label in the label_image, there is a key in this dictionary
-#     the value to each key represents the presence of that label in the face (in percent [0,1]) 
+#     the value to each key represents the presence of that label in the face (in percent [0,1])
 #     '''
 #     # note that all_pixels is in (col,row) format
 #     # use the same for "path.contains_points" and convert to (row,col) for
@@ -1647,14 +1647,14 @@ def _set_edge_occupancy(arrangement,
 #     x, y = np.meshgrid( np.arange(label_image.shape[1]),
 #                         np.arange(label_image.shape[0]))
 #     all_pixels = np.stack( (x.flatten(), y.flatten() ), axis=1)
-    
+
 #     for idx, face in enumerate(arrangement.decomposition.faces):
 #         # set face attributes ['label_vote'], ['label_count']
 #         assign_label_to_face(label_image, face, all_pixels=all_pixels)
 #         # can't set the following since faces is a tuple, and no need to
 #         # arrangement.decomposition.faces[idx] = face
 
-#     return arrangement    
+#     return arrangement
 
 
 
@@ -1683,22 +1683,22 @@ def _set_edge_occupancy(arrangement,
 #     ----
 #     it is assumed that the number of place category labels in the two faces are
 #     the same;
-#     ie. len(face1.attributes['label_count']) == len(face2.attributes['label_count'])    
+#     ie. len(face1.attributes['label_count']) == len(face2.attributes['label_count'])
 #     '''
 
 #     # since the difference between lables in face1 and face2 might be non-empty
 #     # the sequence of if-elif will consider unique labels in each face
 #     # otherwise they could be set as np.array and compute distance faster.
 #     # w1 = face1.attributes['label_count']
-#     # w2 = face2.attributes['label_count']    
-#     # dis = 0		
+#     # w2 = face2.attributes['label_count']
+#     # dis = 0
 #     # for lbl in set( w1.keys()+w2.keys() ):
 #     #     if (lbl in w1) and (lbl in w2):
 #     #         dis += (w1[lbl]-w2[lbl])**2
 #     #     elif lbl in w1:
 #     #         dis += w1[lbl]**2
 #     #     elif lbl in w2:
-#     #         dis += w2[lbl]**2            
+#     #         dis += w2[lbl]**2
 #     # dis = np.sqrt( dis )
 
 #     w1 = face1.attributes['label_count']
@@ -1720,7 +1720,7 @@ def _set_edge_occupancy(arrangement,
 # ################################################################################
 # def are_same_category(face1,face2, label_associations=None, thr=.4):
 #     '''
-#     This method checks if the two input faces are similar according to 
+#     This method checks if the two input faces are similar according to
 #     their place category label (count version)
 #     for the detials on the "count" version see: assign_label_to_face.__doc__
 
@@ -1734,7 +1734,7 @@ def _set_edge_occupancy(arrangement,
 #     if the two faces belong to two different arrangments, there is no gaurantee
 #     that their labels correctly correspond to each other.
 #     to get label_associations, call the method "label_association()".
-#     If not provided (default None), it is assumed the two faces belong to the 
+#     If not provided (default None), it is assumed the two faces belong to the
 #     same arrangement and there for the correspondance are direct.
 
 #     thr (float between (0,1), default: 0.4)
@@ -1746,7 +1746,7 @@ def _set_edge_occupancy(arrangement,
 #     It is required that the "assign_label_to_face()" method is called
 #     before calling this method.
 #     '''
-#     dis = face_category_distance( face1,face2, label_associations )    
+#     dis = face_category_distance( face1,face2, label_associations )
 #     return True if dis<thr else False
 
 
@@ -1759,16 +1759,16 @@ def _set_edge_occupancy(arrangement,
 # ################################################################################
 # def loader (png_name, n_categories=2):
 #     ''' Load files '''
-    
+
 #     yaml_name = png_name[:-3] + 'yaml'
 #     skiz_name = png_name[:-4] + '_skiz.png'
 #     ply_name = png_name[:-3] + 'ply'
-#     label_name = png_name[:-4]+'_labels_km{:s}.npy'.format(str(n_categories))    
-    
+#     label_name = png_name[:-4]+'_labels_km{:s}.npy'.format(str(n_categories))
+
 #     dis_name = png_name[:-4] + '_dis.png'
 #     dis_name = png_name[:-4] + '_dis2.png'
 
-#     ### loading image and converting to binary 
+#     ### loading image and converting to binary
 #     image = np.flipud( cv2.imread( png_name, cv2.IMREAD_GRAYSCALE) )
 #     thr1,thr2 = [200, 255]
 #     ret, image = cv2.threshold(image.astype(np.uint8) , thr1,thr2 , cv2.THRESH_BINARY)
@@ -1780,10 +1780,10 @@ def _set_edge_occupancy(arrangement,
 #     dis_image = np.flipud( cv2.imread(dis_name , cv2.IMREAD_GRAYSCALE) )
 
 #     ### laoding skiz image
-#     skiz = np.flipud( cv2.imread( skiz_name, cv2.IMREAD_GRAYSCALE) )    
+#     skiz = np.flipud( cv2.imread( skiz_name, cv2.IMREAD_GRAYSCALE) )
 
 #     ### loading traits from yamls
-#     trait_data = arr.utls.load_data_from_yaml( yaml_name )   
+#     trait_data = arr.utls.load_data_from_yaml( yaml_name )
 #     traits = trait_data['traits']
 #     boundary = trait_data['boundary']
 #     boundary[0] -= 20
@@ -1812,7 +1812,7 @@ def _set_edge_occupancy(arrangement,
 
 #     for key in keys:
 #         if print_messages: print ('\t *** processing map \'{:s}\':'.format(key))
-        
+
 #         ######################################## loading file
 #         if print_messages: print ('\t loading files [image, label_image, skiz, triat_data] ...')
 #         image, label_image, dis_image, skiz, trait = loader(data_sets[key])
@@ -1825,7 +1825,7 @@ def _set_edge_occupancy(arrangement,
 #         ######################################## deploying arrangement
 #         if print_messages: print ('\t deploying arrangement ... ')
 #         arrange = arr.Arrangement(trait, arr_config)
-        
+
 #         ###############  distance based edge pruning
 #         if print_messages: print ('\t arrangement pruning ... ')
 #         _set_edge_distance_value(arrange, dis_image, prun_dis_neighborhood)
@@ -1837,13 +1837,13 @@ def _set_edge_occupancy(arrangement,
 #         # due to the changes of the arrangement and faces
 #         if print_messages: print ('\t update place categories to faces assignment ...')
 #         arrange = assign_label_to_all_faces(arrange, label_image)
-        
-#         ######################################## 
-#         if print_messages: print ('\t setting ombb attribute of faces ...') 
+
+#         ########################################
+#         if print_messages: print ('\t setting ombb attribute of faces ...')
 #         arrange = _set_ombb_of_faces (arrange)
-        
-#         ######################################## 
-#         if print_messages: print ('\t caching face area weight ...') 
+
+#         ########################################
+#         if print_messages: print ('\t caching face area weight ...')
 #         superface = arrange._get_independent_superfaces()[0]
 #         arrange_area = superface.get_area()
 #         for face in arrange.decomposition.faces:
@@ -1858,7 +1858,7 @@ def _set_edge_occupancy(arrangement,
 
 #         # profiling node, for finding label association with other maps
 #         con_map = profile_nodes(con_map)
-        
+
 #         ######################################## storing results
 #         arrangements[key] = arrange
 #         connectivity_maps[key] = con_map
@@ -1881,11 +1881,11 @@ def _set_edge_occupancy(arrangement,
 #     - tform_type='affine'
 
 #     parameters for "_reject_implausible_transformations()":
-#     - scale_mismatch_ratio_threshold (default: 0.5)    
+#     - scale_mismatch_ratio_threshold (default: 0.5)
 #     - scale_bounds (default: [.3, 3])
 
 #     '''
-    
+
 #     # label_associations = label_association(arrangements, connectivity_maps)
 #     tforms = []
 #     for face_src in arrangements[keys[0]].decomposition.faces:
@@ -1900,7 +1900,7 @@ def _set_edge_occupancy(arrangement,
 #     tforms = np.array(tforms)
 #     if print_messages: print ( '\t totaly {:d} transformations estimated'.format(tforms.shape[0]) )
 #     total_t = tforms.shape[0]
-    
+
 #     tforms = _reject_implausible_transformations( tforms,
 #                                                  images[keys[0]].shape, images[keys[1]].shape,
 #                                                  scale_mismatch_ratio_threshold,
@@ -1931,7 +1931,7 @@ def _set_edge_occupancy(arrangement,
 
 #     if tforms.shape[0] < too_many_tforms:
 #         if print_messages: print ('only {:d} tforms are estimated, so no clustering'.format(tforms.shape[0]))
-        
+
 #         arr_match_score = {}
 #         for idx, tf in enumerate(tforms):
 #             arrange_src = arrangements[keys[0]]
@@ -1950,12 +1950,12 @@ def _set_edge_occupancy(arrangement,
 #         parameters = np.stack([ np.array( [tf.translation[0], tf.translation[1], tf.rotation, tf.scale[0] ] )
 #                                 for tf in tforms ], axis=0)
 #         assert not np.any( np.isnan(parameters))
-        
+
 #         # note that the scaling is only applied to parametes (for clustering),
 #         # the transformations themselves are intact
 #         parameters -= np.mean( parameters, axis=0 )
 #         parameters /= np.std( parameters, axis=0 )
-        
+
 #         #################### clustering pool into hypotheses
 #         if print_messages: print ('\t clustering {:d} transformations'.format(parameters.shape[0]))
 #         # min_s = max ([ 2, int( .05* np.min([ len(arrangements[key].decomposition.faces) for key in keys ]) ) ])
@@ -1971,13 +1971,13 @@ def _set_edge_occupancy(arrangement,
 #         for lbl in np.setdiff1d(unique_labels,[-1]):
 #             class_member_idx = np.nonzero(labels == lbl)[0]
 #             class_member = [ tforms[idx] for idx in class_member_idx ]
-            
+
 #             # pick the one that is closest to all others in the same group
 #             params = parameters[class_member_idx]
 #             dist_mat = scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(params, 'euclidean'))
 #             dist_arr = dist_mat.sum(axis=0)
 #             tf = class_member[ np.argmin(dist_arr) ]
-            
+
 #             arrange_src = arrangements[keys[0]]
 #             arrange_dst = arrangements[keys[1]]
 #             arr_match_score[lbl] = _arrangement_match_score(arrange_src, arrange_dst, tf)#, label_associations)
@@ -1998,7 +1998,7 @@ def _set_edge_occupancy(arrangement,
 #         ### pick the wining cluster
 #         hypothesis_idx = max(arr_match_score, key=arr_match_score.get)
 #         hypothesis =  winning_cluster[hypothesis_idx]
-        
+
 #         n_cluster = unique_labels.shape[0]-1
 
 #     np.save('arr_match_score_'+'_'.join(keys)+'.npy', arr_match_score)
@@ -2021,7 +2021,7 @@ def _set_edge_occupancy(arrangement,
 #     arrange_src = copy.deepcopy(arrangement_src)
 #     arrange_dst = copy.deepcopy(arrangement_dst)
 
-#     ### transforming paths of faces, and updating centre points 
+#     ### transforming paths of faces, and updating centre points
 #     faces_src = arrange_src.decomposition.faces
 #     # faces_src = [ face for face in arrange_src.decomposition.faces if face.attributes['label_vote'] != -1]
 #     for face in faces_src:
@@ -2031,7 +2031,7 @@ def _set_edge_occupancy(arrangement,
 #     faces_dst = arrange_dst.decomposition.faces
 #     # faces_dst = [ face for face in arrange_dst.decomposition.faces if face.attributes['label_vote'] != -1]
 #     # for face in faces_dst: face.attributes['centre'] = np.mean(face.path.vertices[:-1,:], axis=0)
-    
+
 #     # find face to face association
 #     f2f_association = find_face2face_association(faces_src, faces_dst)
 
@@ -2047,10 +2047,10 @@ def _set_edge_occupancy(arrangement,
 #     for (f1_idx,f2_idx) in f2f_match_score.keys():
 #         # f1_area = faces_src[f1_idx].get_area()
 #         # f2_area = faces_dst[f2_idx].get_area()
-    
+
 #         # f1_w = float(f1_area) / float(arrange_src_area)
 #         # f2_w = float(f2_area) / float(arrange_dst_area)
-        
+
 #         # face_pair_weight[(f1_idx,f2_idx)] = np.min([f1_w, f2_w])
 #         face_pair_weight[(f1_idx,f2_idx)] = np.min([faces_src[f1_idx].attributes['area_weight'],
 #                                                     faces_dst[f2_idx].attributes['area_weight']])
@@ -2103,7 +2103,7 @@ def _set_edge_occupancy(arrangement,
 #         face_cen_src = aff2d.transform(np.array([face.attributes['centre'] for face in faces_src]))
 
 #     face_cen_dst = np.array([face.attributes['centre'] for face in faces_dst])
-        
+
 #     f2f_association = {}
 #     for src_idx in range(f2f_distance.shape[0]):
 #         # if the centre of faces in dst are not inside the current face of src
@@ -2148,7 +2148,7 @@ def _set_edge_occupancy(arrangement,
 #     union = p1 | p2
 #     intersection = p1 & p2
 
-#     # if one of the faces has the area equal to zero 
+#     # if one of the faces has the area equal to zero
 #     if union.area() == 0: return 0.
 
 #     overlap_ratio = intersection.area() / union.area()
@@ -2159,17 +2159,17 @@ def _set_edge_occupancy(arrangement,
 # def objectivefun_image (X , *arg):
 #     '''
 #     X: the set of variables to be optimized
-    
+
 #     src: source image (model - template)
 #     dst: destination image (static scene - target)
 #     '''
-#     tx, ty, s, t = X 
+#     tx, ty, s, t = X
 #     tform = skimage.transform.AffineTransform(scale=(s,s),
 #                                               rotation=t,
 #                                               translation=(tx,ty))
 #     src_image, dst_image = arg[0], arg[1]
 #     mse, l2 = mse_norm(src_image, dst_image, tform)
-    
+
 #     return mse
 
 
@@ -2187,7 +2187,7 @@ def _set_edge_occupancy(arrangement,
 #     minY, maxY = 1, src_image.shape[0]-1 #skiping boundary poitns
 #     # mbb-path of src before transform
 #     src_mbb_pts = np.array([[minX,minY],[maxX,minY],[maxX,maxY],[minX,maxY],[minX,minY]])
-#     src_mbb_path = _create_mpath ( src_mbb_pts )    
+#     src_mbb_path = _create_mpath ( src_mbb_pts )
 #     # mbb-path of src after transform
 #     src_warp_mbb_pts = tform._apply_mat(src_mbb_pts, tform.params)
 #     src_warp_mbb_path = _create_mpath ( src_warp_mbb_pts )
@@ -2198,7 +2198,7 @@ def _set_edge_occupancy(arrangement,
 #     X, Y = np.meshgrid(X, Y)
 #     src_idx = np.vstack( (X.flatten(), Y.flatten()) ).T
 #     src_idx_warp = tform._apply_mat(src_idx, tform.params).astype(int)
-    
+
 #     # get the extent of destination image
 #     minX, maxX = 1, dst_image.shape[1]-1 #skiping boundary poitns
 #     minY, maxY = 1, dst_image.shape[0]-1 #skiping boundary poitns
@@ -2210,11 +2210,11 @@ def _set_edge_occupancy(arrangement,
 #     # mbb-path of dst
 #     dst_mbb_pts = np.array([[minX,minY],[maxX,minY],[maxX,maxY],[minX,maxY],[minX,minY]])
 #     dst_mbb_path = _create_mpath ( dst_mbb_pts )
-    
+
 
 #     ###### find the area of intersection (overlap) and union
 #     # easiest way to compute the intersection area is to count the number pixels
-#     # from one image in the mbb-path of the other.    
+#     # from one image in the mbb-path of the other.
 #     # since the pixels in src_idx_warp are transformed (change of scale), they
 #     # no longer represent the area, so I have to count the number of dst_idx
 #     # containted by the src_warp_mbb_path
@@ -2231,7 +2231,7 @@ def _set_edge_occupancy(arrangement,
 #     # if intersect_area==0: return 127 , 127*union_area/2.# return average error
 
 
-#     ###### computing l2-norm and MSE 
+#     ###### computing l2-norm and MSE
 #     # find those pixels of src (after warp) that are inside mbb of dst
 #     in_dst_mbb = dst_mbb_path.contains_points(src_idx_warp)
 #     # src_idx = src_idx[in_dst_mbb]
@@ -2246,6 +2246,6 @@ def _set_edge_occupancy(arrangement,
 #     # compute MSE (l2 averaged over intersection area)
 #     mse = l2 / float(dst_overlap.shape[0])
 
-    
+
 #     if 1: print(mse, l2)
 #     return  mse, l2  # * overlap_error

@@ -1,6 +1,6 @@
 '''
 Copyright (C) Saeed Gholami Shahbandi. All rights reserved.
-Author: Saeed Gholami Shahbandi (saeed.gh.sh@gmail.com)
+Author: Saeed Gholami Shahbandi
 
 This file is part of Arrangement Library.
 The of Arrangement Library is free software: you can redistribute it and/or
@@ -90,7 +90,7 @@ def FindPeaks (signal,
             if (peakval[0] < peakval[-1]):
                 peakind.pop(0)
             else:
-                peakind.pop(-1)           
+                peakind.pop(-1)
 
     # 4_ MinPeakVal
     peakval = list(signal[peakind])
@@ -106,7 +106,7 @@ def polar_distance(angle1, angle2, radian=False):
     '''
     '''
     dist = []
-    if radian:    
+    if radian:
         dist.append( np.abs(angle2 - angle1) )
         dist.append( np.abs(angle2 - (angle1 + (2*np.pi))) )
         dist.append( np.abs(angle2 - (angle1 - (2*np.pi))) )
@@ -139,7 +139,7 @@ def Gauss1D(x, mu, s):
 def Gauss2DNormal(Size, Sigma = 0.7, Normalize = '/sum'):
     '''
     '''
-    # borrowed from: https://gist.github.com/andrewgiessel 
+    # borrowed from: https://gist.github.com/andrewgiessel
     # fwhm: full width at half maximum
     # fwhm = 2 * (sqrt(2*(ln(2)))) * sigma
 
@@ -147,9 +147,9 @@ def Gauss2DNormal(Size, Sigma = 0.7, Normalize = '/sum'):
     y = x[:,np.newaxis]
 
     x0 = y0 = Size // 2
-    
+
     gauss = np.exp(-((x-x0)**2 + (y-y0)**2) / (2*(Sigma**2)) )
-    
+
     if Normalize == '/sum':
         gauss = gauss / np.sum(gauss)
     elif Normalize == '/2*pi*sigma**2':
@@ -169,7 +169,7 @@ def GammaFilter (Size=3, Sigma=0.7, Order=1):
     dx = np.arange(Size/2, -Size/2, -1, float)
     dx = np.arange(-Size/2, Size/2, 1, float) + 1
     dy = dx[:,np.newaxis]
-    
+
     MN = (-(dx + np.sign(Order)*1j*dy) / Sigma**2)** np.abs(Order)
 
     return MN * GaussKernel
@@ -178,12 +178,12 @@ def GammaFilter (Size=3, Sigma=0.7, Order=1):
 def OriGradient (Image, KernelSize=7, KernelSigma=1, AngleMode='full', ConvMode='valid', Gamma=.5):
     """
     A function to calculate the "Oriented Gradients" of an input image.
-    
+
     Inputs is a gray-scale image, and the output is an array (np.ndarray). Each value of the output represents the oriented gradient of the corresponding pixel in the input image. The angle and magnitude of the orientated gradient are represented in an Euler format.
 
     There is difference between the size of input and output, depending on the size of the kernel:
     input.shape[i] = output.shape[i] + (KernelSize-1)
-    
+
     KernelSize and KernelSigma, define the derivative kernel.
     AngleModel controls the angular interval of the output, full=[-pi,pi], half=[-pi/2,pi/2]
 
@@ -192,14 +192,14 @@ def OriGradient (Image, KernelSize=7, KernelSigma=1, AngleMode='full', ConvMode=
     gammafilter = GammaFilter (KernelSize, KernelSigma, Order=1)
     oriented_grad = scipy.signal.convolve2d(Image, gammafilter, mode=ConvMode,
                                             boundary='fill', fillvalue=0)
-    
+
     magnitude = np.abs(oriented_grad)**Gamma
 
     if (AngleMode == 'full'):
         angle = np.angle(oriented_grad)
     elif (AngleMode == 'half'):
         angle = np.angle( np.exp(2*1j*np.angle(oriented_grad)) ) / 2.0
-        
+
     return magnitude * np.exp(1j * angle)
 
 ################################################################################
@@ -209,10 +209,10 @@ def wHOG (OrientedGradient, NumBin=180*5, Extension=True):
     It is used for dominant orientation detection.
 
     The output is a histogram of orientations (angles), where the value of the histogram is coming from the number AND magnitude of all gradients with similar orientations.
-    
+
     "OrientedGradient" from input arguments is the oriented gradient field of an image, not the image itself
-    
-    "Extension": in order to have continuity at -pi/2 and pi/2 in the histogram of gradients, the signal is extended with value of itself. The portion of extension is 0.2 if (extention=True), otherwise the portion is (extention[0]/extention[1]).    
+
+    "Extension": in order to have continuity at -pi/2 and pi/2 in the histogram of gradients, the signal is extended with value of itself. The portion of extension is 0.2 if (extention=True), otherwise the portion is (extention[0]/extention[1]).
     '''
 
     # cutting out the border, because otherwise there will be steep peaks at [0, pi/2., ...]
@@ -233,7 +233,7 @@ def wHOG (OrientedGradient, NumBin=180*5, Extension=True):
             a,b = 1,5 # (a/b) = portion to extend at beginning and end
         else:
             a,b = Extension
-            
+
         veclen = hist.shape[0]
 
         hist1 = hist[ (b-a)*veclen/b:veclen ]
@@ -254,32 +254,32 @@ def smooth(x, window_len=11, window='hanning'):
     """
     smooth the data using a window with requested size.
     http://scipy-cookbook.readthedocs.io/items/SignalSmooth.html
-    
+
     This method is based on the convolution of a scaled window with the signal.
-    The signal is prepared by introducing reflected copies of the signal 
+    The signal is prepared by introducing reflected copies of the signal
     (with the window size) in both ends so that transient parts are minimized
     in the begining and end part of the output signal.
-    
+
     input:
-        x: the input signal 
+        x: the input signal
         window_len: the dimension of the smoothing window; should be an odd integer
         window: the type of window from 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'
             flat window will produce a moving average smoothing.
 
     output:
         the smoothed signal
-        
+
     example:
 
     t=linspace(-2,2,0.1)
     x=sin(t)+randn(len(t))*0.1
     y=smooth(x)
-    
-    see also: 
-    
+
+    see also:
+
     numpy.hanning, numpy.hamming, numpy.bartlett, numpy.blackman, numpy.convolve
     scipy.signal.lfilter
- 
+
     TODO: the window parameter could be the window itself if an array instead of a string
     NOTE: length(output) != length(input), to correct this:
     return y[(window_len/2-1):-(window_len/2)] instead of just y.

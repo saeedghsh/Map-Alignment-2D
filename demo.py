@@ -1,6 +1,6 @@
 '''
 Copyright (C) Saeed Gholami Shahbandi. All rights reserved.
-Author: Saeed Gholami Shahbandi (saeed.gh.sh@gmail.com)
+Author: Saeed Gholami Shahbandi
 
 This file is part of Arrangement Library.
 The of Arrangement Library is free software: you can redistribute it and/or
@@ -54,7 +54,7 @@ def _extract_target_file_name(img_src, img_dst, method=None):
 ################################################################################
 ################################################################################
 if __name__ == '__main__':
-    '''    
+    '''
     list of supported options
     -------------------------
     -visualize
@@ -74,7 +74,7 @@ if __name__ == '__main__':
     -------
     python demo.py --img_src 'tests/maps/map_src.png' --img_dst 'tests/maps/map_dst.png' -multiprocessing -visualize
     python demo.py --img_src 'tests/maps/map_src.png' --img_dst 'tests/maps/map_dst.png' -multiprocessing -save_to_file
-    '''    
+    '''
 
     args = sys.argv
 
@@ -87,7 +87,7 @@ if __name__ == '__main__':
 
     ###### fetching parameters from input arguments
     # parameters are marked with double dash,
-    # the value of a parameter is the next argument   
+    # the value of a parameter is the next argument
     listiterator = args[1:].__iter__()
     while 1:
         try:
@@ -95,8 +95,8 @@ if __name__ == '__main__':
             if item[:2] == '--':
                 exec(item[2:] + ' = next( listiterator )')
         except:
-            break   
-        
+            break
+
     ##### setting defaults values for visualization and saving options
     visualize = True if 'visualize' in options else False
     save_to_file = True if 'save_to_file' in options else False
@@ -105,10 +105,10 @@ if __name__ == '__main__':
     # save_to_file = out_file_name if save_to_file==True else False
     multiprocessing = True if 'multiprocessing' in options else False
 
-    
+
     ################################################################################
     print_messages = False
-    
+
     ########## image loading, SKIZ, distance transform and trait detection
     lnl_config = {'binary_threshold_1': 200, # with numpy - for SKIZ and distance
                   'binary_threshold_2': [100, 255], # with cv2 - for trait detection
@@ -125,8 +125,8 @@ if __name__ == '__main__':
     multiprocessing = True
     visualize = True
     ########################################
-    
-    
+
+
     src_results, src_lnl_t = mapali._lock_n_load(img_src, lnl_config)
     dst_results, dst_lnl_t = mapali._lock_n_load(img_dst, lnl_config)
 
@@ -135,18 +135,18 @@ if __name__ == '__main__':
                   'prune_dis_neighborhood': 2,
                   'prune_dis_threshold': .075, # home:0.15 - office:0.075
                   'occupancy_threshold': 200} # cell below this is considered occupied
-    
+
     src_results['arrangement'], src_arr_t = mapali._construct_arrangement(src_results, arr_config)
     dst_results['arrangement'], dst_arr_t = mapali._construct_arrangement(dst_results, arr_config)
 
     # time
-    interpret_t = src_lnl_t + src_arr_t + dst_lnl_t + dst_arr_t 
-    
+    interpret_t = src_lnl_t + src_arr_t + dst_lnl_t + dst_arr_t
+
     ########## Hypothesis generation
     hyp_config = { 'scale_mismatch_ratio_threshold': .3, # .5,
                    'scale_bounds': [.5, 2], #[.1, 10]
                    'face_occupancy_threshold': .5}
-    
+
     tforms, hyp_gen_t, tforms_total, tforms_after_reject = mapali._generate_hypothese(src_results['arrangement'],
                                                                                       src_results['image'].shape,
                                                                                       dst_results['arrangement'],
@@ -162,7 +162,7 @@ if __name__ == '__main__':
                                                                          dst_results['arrangement'],
                                                                          tforms, sel_config)
 
-    details = { 
+    details = {
         'src_lnl_t': src_lnl_t,
         'dst_lnl_t': dst_lnl_t,
         'src_arr_t': src_arr_t,
