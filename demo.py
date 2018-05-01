@@ -29,8 +29,8 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 
-from map_alignment import map_alignment as mapali
-from map_alignment import mapali_plotting as maplt
+import map_alignment.map_alignment as mapali
+import map_alignment.mapali_plotting as maplt
 
 ################################################################################
 ################################################################################
@@ -72,8 +72,8 @@ if __name__ == '__main__':
 
     example
     -------
-    python demo.py --img_src 'tests/maps/map_src.png' --img_dst 'tests/maps/map_dst.png' -multiprocessing -visualize
-    python demo.py --img_src 'tests/maps/map_src.png' --img_dst 'tests/maps/map_dst.png' -multiprocessing -save_to_file
+    python demo.py --img_src 'map_sample/map_src.png' --img_dst 'map_sample/map_dst.png' -multiprocessing -visualize
+    python demo.py --img_src 'map_sample/map_src.png' --img_dst 'map_sample/map_dst.png' -multiprocessing -save_to_file
     '''
 
     args = sys.argv

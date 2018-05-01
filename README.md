@@ -2,8 +2,13 @@ Map-Alignment-2D
 ================
 
 This package has been developed for 2D Map Alignment With Region Decomposition.
-Details of the method are presented in the following publication.
+![animate](https://github.com/saeedghsh/Map-Alignment-2D/blob/master/docs/mapali_hyp_gen.gif)
+
+The following article presents the method:
 - Saeed Gholami Shahbandi, Martin Magnusson, *2D Map Alignment With Region Decomposition*, CoRR, abs/1709.00309, 2017. [URL](https://arxiv.org/abs/1709.00309)
+
+And [*Nonrigid Optimization of Multimodal 2D Map Alignment*](https://github.com/saeedghsh/Map-Alignment-Nonrigid-Optimization-2D) build on this work.
+
 
 Dependencies and Download
 -------------------------
@@ -29,11 +34,31 @@ Usage Example
 -------------
 For simplicity and convenience, we assume both maps are provided as bitmap (occupancy grid maps).
 For more examples, see [Halmstad Map Collection](https://github.com/saeedghsh/Halmstad-Robot-Maps).
-- Demo
+Run this:
 ```shell
-python demo.py --img_src 'tests/maps/map_src.png' --img_dst 'tests/maps/map_dst.png' -multiprocessing -visualize
+python demo.py --img_src 'map_sample/map_src.png' --img_dst 'map_sample/map_dst.png' -multiprocessing -visualize
 ```
+And you should see this:
 ![example](https://github.com/saeedghsh/Map-Alignment-2D/blob/master/docs/maps_map_src__maps_map_dst.png)
+
+Simplified Algorithm (without decomposition and arrangement)
+------------------------------------------------------------
+The following psudo-code presents the gist of the alignment algorithm proposed in the paper.
+
+```python
+# modeling
+1a) perform region segmentation
+1b) find the oriented minimum bounding box (OMBB) for each region (e.g. rotating calipers)
+
+# hypotehsis generation
+2a) generate hypotheses (affine transformations), by matching every pairs of OMBB from the two maps
+2b) reject hypothesis that are non-similarity transformation
+
+# match score and select a winner 
+3a) for each hypothesis: find the correspondence between all OMBB from one map to another
+3b) calculate the match-score for each hypothesis, and select the one with highest value
+```
+
 
 
 <!-- Parameters Setting -->

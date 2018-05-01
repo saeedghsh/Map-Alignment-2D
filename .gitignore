@@ -25,3 +25,5 @@
 
 *.tex.backup
 *~
+
+dev/

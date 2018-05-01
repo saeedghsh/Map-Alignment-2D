@@ -702,9 +702,9 @@ def _arrangement_match_score_4partial(idx, arrangement_src, arrangement_dst, tfo
 
 ################################################################################
 def _reject_implausible_transformations(transformations,
-                                       image_src_shape, image_dst_shape,
-                                       scale_mismatch_ratio_threshold=.1,
-                                       scale_bounds=[.1, 10] ):
+                                        image_src_shape, image_dst_shape,
+                                        scale_mismatch_ratio_threshold=.1,
+                                        scale_bounds=[.1, 10] ):
     '''
     Input
     -----
