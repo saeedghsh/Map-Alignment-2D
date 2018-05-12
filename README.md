@@ -7,7 +7,7 @@ This package has been developed for 2D Map Alignment With Region Decomposition.
 The following article presents the method:
 - Saeed Gholami Shahbandi, Martin Magnusson, *2D Map Alignment With Region Decomposition*, CoRR, abs/1709.00309, 2017. [URL](https://arxiv.org/abs/1709.00309)
 
-And [*Nonrigid Optimization of Multimodal 2D Map Alignment*](https://github.com/saeedghsh/Map-Alignment-Nonrigid-Optimization-2D) build on this work.
+And [*Nonrigid Optimization of Multimodal 2D Map Alignment*](https://github.com/saeedghsh/Map-Alignment-Nonrigid-Optimization-2D) builds on this work.
 
 
 Dependencies and Download
@@ -45,7 +45,7 @@ Simplified Algorithm (without decomposition and arrangement)
 ------------------------------------------------------------
 The following psudo-code presents the gist of the alignment algorithm proposed in the paper.
 
-```python
+```
 # modeling
 1a) perform region segmentation
 1b) find the oriented minimum bounding box (OMBB) for each region (e.g. rotating calipers)
@@ -58,8 +58,6 @@ The following psudo-code presents the gist of the alignment algorithm proposed i
 3a) for each hypothesis: find the correspondence between all OMBB from one map to another
 3b) calculate the match-score for each hypothesis, and select the one with highest value
 ```
-
-
 
 <!-- Parameters Setting -->
 <!-- ------------------ -->
